@@ -16,7 +16,7 @@ const ptr = ffi.getSymbolPtr(handle, 'add');
 ## 创建 CFunction 包装
 
 ```typescript
-import { CFunction, FFIType } from 'library';
+import { CFunction, FFIType } from 'arkffi';
 
 const add = CFunction({
   args: [FFIType.double, FFIType.double],
@@ -41,7 +41,7 @@ fn.close();
 ## 传递给 C API
 
 ```typescript
-import { CFunction, FFIType } from 'library';
+import { CFunction, FFIType } from 'arkffi';
 
 // C: void sort(int* arr, int (*cmp)(int, int));
 const cmp = CFunction({ args: [FFIType.int32, FFIType.int32], returns: FFIType.int32, ptr: cmpPtr });

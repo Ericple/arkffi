@@ -60,12 +60,8 @@ arkffi/
 
 ## 安装
 
-```json
-{
-  "dependencies": {
-    "library": "file:./library"
-  }
-}
+```bash
+ohpm install arkffi
 ```
 
 ## API 一览

@@ -58,7 +58,7 @@ cb.call(1); // 抛出异常：句柄无效
 ## 多个回调
 
 ```typescript
-import { JSCallback, FFIType } from 'library';
+import { JSCallback, FFIType } from 'arkffi';
 
 const add = new JSCallback(fn1, { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 });
 const mul = new JSCallback(fn2, { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 });

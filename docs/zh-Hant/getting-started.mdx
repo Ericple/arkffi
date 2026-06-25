@@ -48,7 +48,7 @@ description: "安裝 arkffi 並調用你的第一個 C 函數"
   <Step title="導入並使用">
 
     ```typescript
-    import { dlopen, FFIType, CString, CFunction, JSCallback } from 'library';
+    import { dlopen, FFIType, CString, CFunction, JSCallback } from 'arkffi';
 
     const lib = dlopen('libmylib.so', {
       calculate: {

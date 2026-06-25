@@ -40,7 +40,7 @@ arkffi 提供三个抽象层：
 ## 快速开始
 
 ```typescript
-import { dlopen, FFIType, CString } from 'library';
+import { dlopen, FFIType, CString } from 'arkffi';
 
 const lib = dlopen('libffi_target.so', {
   add:        { args: [FFIType.double, FFIType.double], returns: FFIType.double },
@@ -64,10 +64,6 @@ liblibrary.so ──dlopen/dlsym/dlclose──► libffi_target.so (或任意 .s
 
 ## 安装
 
-```json
-{
-  "dependencies": {
-    "library": "file:./library"
-  }
-}
+```bash
+ohpm install arkffi
 ```

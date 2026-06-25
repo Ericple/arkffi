@@ -9,7 +9,7 @@ description: "将原始 C 函数指针包装为可调用的 JavaScript 函数"
 
 ```typescript
 import ffi from 'liblibrary.so';
-import { CFunction, FFIType } from 'library';
+import { CFunction, FFIType } from 'arkffi';
 
 const handle = ffi.load('libffi_target.so');
 const ptr = ffi.getSymbolPtr(handle, 'add');
@@ -51,7 +51,7 @@ function CFunction(def: {
 使用 `ffi.getSymbolPtr(handle, name)`：
 
 ```typescript
-import { CFunction, FFIType } from 'library';
+import { CFunction, FFIType } from 'arkffi';
 import ffi from 'liblibrary.so';
 
 const handle = ffi.load('lib.so');

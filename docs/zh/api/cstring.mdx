@@ -8,7 +8,7 @@ description: "从原始指针读取 C 字符串"
 ## 示例
 
 ```typescript
-import { dlopen, FFIType, CString } from 'library';
+import { dlopen, FFIType, CString } from 'arkffi';
 
 const lib = dlopen('libffi_target.so', {
   getVersion: { args: [], returns: FFIType.int64 },

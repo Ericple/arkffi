@@ -17,7 +17,7 @@ function dlopen<Fns extends Record<string, FFIFunction>>(
 ## 示例
 
 ```typescript
-import { dlopen, FFIType } from 'library';
+import { dlopen, FFIType } from 'arkffi';
 
 const lib = dlopen('libffi_target.so', {
   add:     { args: [FFIType.double, FFIType.double],     returns: FFIType.double },
@@ -51,7 +51,7 @@ interface FFIFunction {
 `dlopen` 使用 TypeScript 泛型推断 `symbols` 的结构，为所有定义的函数名提供 IDE 自动补全。
 
 ```typescript
-import { dlopen, FFIType } from 'library';
+import { dlopen, FFIType } from 'arkffi';
 
 const lib = dlopen('lib.so', {
   myFunc: { args: [FFIType.double, FFIType.double], returns: FFIType.double },

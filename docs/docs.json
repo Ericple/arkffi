@@ -1,11 +1,11 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "arkffi",
+  "name": "ArkFFI",
   "colors": {
-    "primary": "#6366F1",
-    "light": "#818CF8",
-    "dark": "#4F46E5"
+    "primary": "#007AFF",
+    "light": "#007AFF",
+    "dark": "#007AFF"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -92,7 +92,7 @@
     ]
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/logo-light.svg",
+    "dark": "/logo/logo-dark.svg"
   }
 }

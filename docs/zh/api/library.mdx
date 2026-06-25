@@ -8,7 +8,7 @@ description: "dlopen 返回的加载库实例"
 ## 示例
 
 ```typescript
-import { dlopen, FFIType } from 'library';
+import { dlopen, FFIType } from 'arkffi';
 
 const lib = dlopen('libffi_target.so', {
   add: { args: [FFIType.double, FFIType.double], returns: FFIType.double },

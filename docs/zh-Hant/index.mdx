@@ -40,7 +40,7 @@ arkffi 提供三個抽象層：
 ## 快速開始
 
 ```typescript
-import { dlopen, FFIType, CString } from 'library';
+import { dlopen, FFIType, CString } from 'arkffi';
 
 const lib = dlopen('libffi_target.so', {
   add:        { args: [FFIType.double, FFIType.double], returns: FFIType.double },
