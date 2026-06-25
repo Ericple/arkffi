@@ -28,12 +28,91 @@ struct CallbackSlot {
     napi_ref ref;
     bool active;
     bool threadsafe;
+    napi_threadsafe_function tsfn;
 };
 
 static const int MAX_CALLBACK_SLOTS = 16;
 static CallbackSlot g_callbackSlots[MAX_CALLBACK_SLOTS];
 
+static const int MAX_TRAMPOLINES = 16;
+static void* g_trampolines[MAX_TRAMPOLINES];
+static bool g_trampolinesReady = false;
+
 static std::map<std::pair<uint64_t, std::string>, FuncEntry> g_registry;
+
+static napi_env g_mainEnv = nullptr;
+
+static int32_t TrampolineDispatcher(int slotIdx, int32_t arg)
+{
+    if (slotIdx < 0 || slotIdx >= MAX_CALLBACK_SLOTS || !g_callbackSlots[slotIdx].active) {
+        return 0;
+    }
+
+    napi_env env = g_mainEnv;
+    if (env == nullptr) return 0;
+
+    napi_value jsCb;
+    napi_status status = napi_get_reference_value(env, g_callbackSlots[slotIdx].ref, &jsCb);
+    if (status != napi_ok || jsCb == nullptr) return 0;
+
+    napi_value jsArg;
+    napi_create_int32(env, arg, &jsArg);
+
+    napi_value resultVal;
+    status = napi_call_function(env, nullptr, jsCb, 1, &jsArg, &resultVal);
+    if (status != napi_ok) return 0;
+
+    int32_t result = 0;
+    napi_get_value_int32(env, resultVal, &result);
+    return result;
+}
+
+#define DEFINE_TRAMPOLINE(n) \
+    static int32_t Trampoline_##n(int32_t a) { return TrampolineDispatcher(n, a); }
+
+DEFINE_TRAMPOLINE(0)
+DEFINE_TRAMPOLINE(1)
+DEFINE_TRAMPOLINE(2)
+DEFINE_TRAMPOLINE(3)
+DEFINE_TRAMPOLINE(4)
+DEFINE_TRAMPOLINE(5)
+DEFINE_TRAMPOLINE(6)
+DEFINE_TRAMPOLINE(7)
+DEFINE_TRAMPOLINE(8)
+DEFINE_TRAMPOLINE(9)
+DEFINE_TRAMPOLINE(10)
+DEFINE_TRAMPOLINE(11)
+DEFINE_TRAMPOLINE(12)
+DEFINE_TRAMPOLINE(13)
+DEFINE_TRAMPOLINE(14)
+DEFINE_TRAMPOLINE(15)
+
+static void InitTrampolines()
+{
+    if (g_trampolinesReady) return;
+    void* tbl[] = {
+        reinterpret_cast<void*>(Trampoline_0),
+        reinterpret_cast<void*>(Trampoline_1),
+        reinterpret_cast<void*>(Trampoline_2),
+        reinterpret_cast<void*>(Trampoline_3),
+        reinterpret_cast<void*>(Trampoline_4),
+        reinterpret_cast<void*>(Trampoline_5),
+        reinterpret_cast<void*>(Trampoline_6),
+        reinterpret_cast<void*>(Trampoline_7),
+        reinterpret_cast<void*>(Trampoline_8),
+        reinterpret_cast<void*>(Trampoline_9),
+        reinterpret_cast<void*>(Trampoline_10),
+        reinterpret_cast<void*>(Trampoline_11),
+        reinterpret_cast<void*>(Trampoline_12),
+        reinterpret_cast<void*>(Trampoline_13),
+        reinterpret_cast<void*>(Trampoline_14),
+        reinterpret_cast<void*>(Trampoline_15),
+    };
+    for (int i = 0; i < MAX_TRAMPOLINES; i++) {
+        g_trampolines[i] = tbl[i];
+    }
+    g_trampolinesReady = true;
+}
 
 static napi_value Load(napi_env env, napi_callback_info info)
 {
@@ -147,7 +226,7 @@ static napi_value DispatchCallFromArrays(napi_env env,
     char ret = entry.returnType;
 
     for (size_t k = 0; k < sig.size(); k++) {
-        if (sig[k] == 'l' || sig[k] == 'b' || sig[k] == 'c' || sig[k] == 'p') {
+            if (sig[k] == 'l' || sig[k] == 'b' || sig[k] == 'c' || sig[k] == 'p') {
             sig[k] = 'i';
         } else if (sig[k] == 'f') {
             sig[k] = 'd';
@@ -163,14 +242,14 @@ static napi_value DispatchCallFromArrays(napi_env env,
 
     for (size_t k = 0; k < sig.size(); k++) {
         napi_value e;
-        if (sig[k] == 'i' || sig[k] == 'l' || sig[k] == 'b' || sig[k] == 'c' || sig[k] == 'p') {
+        if (sig[k] == 'i' || sig[k] == 'l' || sig[k] == 'b' || sig[k] == 'c' || sig[k] == 'p' || sig[k] == 'k') {
             napi_get_element(env, numArgs, numIdx, &e);
-            int32_t val;
-            napi_get_value_int32(env, e, &val);
-            if (sig[k] == 'l' || sig[k] == 'p') {
-                int64Buf[ni] = static_cast<int64_t>(val);
+            int64_t val;
+            napi_get_value_int64(env, e, &val);
+            if (sig[k] == 'l' || sig[k] == 'p' || sig[k] == 'k') {
+                int64Buf[ni] = val;
             } else {
-                intBuf[ni] = val;
+                intBuf[ni] = static_cast<int32_t>(val);
             }
             ni++;
             numIdx++;
@@ -251,6 +330,26 @@ static napi_value DispatchCallFromArrays(napi_env env,
         typedef double (*F)(double, int32_t);
         double r = reinterpret_cast<F>(func)(dblBuf[0], intBuf[0]);
         napi_create_double(env, r, &result);
+    } else if (sig == "ki") {
+        if (ret == 'i') {
+            typedef int32_t (*F)(int64_t, int32_t);
+            int32_t r = reinterpret_cast<F>(func)(int64Buf[0], intBuf[0]);
+            napi_create_int32(env, r, &result);
+        } else {
+            typedef double (*F)(int64_t, int32_t);
+            double r = reinterpret_cast<F>(func)(int64Buf[0], intBuf[0]);
+            napi_create_double(env, r, &result);
+        }
+    } else if (sig == "k") {
+        if (ret == 'i') {
+            typedef int32_t (*F)(int64_t);
+            int32_t r = reinterpret_cast<F>(func)(int64Buf[0]);
+            napi_create_int32(env, r, &result);
+        } else {
+            typedef double (*F)(int64_t);
+            double r = reinterpret_cast<F>(func)(int64Buf[0]);
+            napi_create_double(env, r, &result);
+        }
     } else if (sig == "ids") {
         typedef double (*F)(int32_t, double, const char*);
         double r = reinterpret_cast<F>(func)(intBuf[0], dblBuf[0], strBuf[0]);
@@ -545,6 +644,24 @@ static napi_value CreateCallback(napi_env env, napi_callback_info info)
     g_callbackSlots[slotIdx].ref = cbRef;
     g_callbackSlots[slotIdx].active = true;
     g_callbackSlots[slotIdx].threadsafe = threadsafe;
+    g_callbackSlots[slotIdx].tsfn = nullptr;
+
+    if (threadsafe) {
+        InitTrampolines();
+        napi_value asyncName;
+        napi_create_string_utf8(env, "JSCallback", NAPI_AUTO_LENGTH, &asyncName);
+        napi_create_threadsafe_function(
+            env, args[0], nullptr, asyncName,
+            0, 1, nullptr, nullptr, nullptr,
+            [](napi_env tsfnEnv, napi_value jsCb, void* context, void* data) {
+                napi_value arg;
+                napi_create_int32(tsfnEnv, *static_cast<int32_t*>(data), &arg);
+                napi_value result;
+                napi_call_function(tsfnEnv, nullptr, jsCb, 1, &arg, &result);
+                delete static_cast<int32_t*>(data);
+            },
+            &g_callbackSlots[slotIdx].tsfn);
+    }
 
     napi_value result;
     napi_create_double(env, static_cast<double>(slotIdx + 1), &result);
@@ -563,6 +680,11 @@ static napi_value DestroyCallback(napi_env env, napi_callback_info info)
 
     int slotIdx = static_cast<int>(handleValue) - 1;
     if (slotIdx >= 0 && slotIdx < MAX_CALLBACK_SLOTS && g_callbackSlots[slotIdx].active) {
+        if (g_callbackSlots[slotIdx].threadsafe && g_callbackSlots[slotIdx].tsfn != nullptr) {
+            napi_release_threadsafe_function(g_callbackSlots[slotIdx].tsfn,
+                                              napi_tsfn_release);
+            g_callbackSlots[slotIdx].tsfn = nullptr;
+        }
         napi_delete_reference(env, g_callbackSlots[slotIdx].ref);
         g_callbackSlots[slotIdx].ref = nullptr;
         g_callbackSlots[slotIdx].active = false;
@@ -624,9 +746,103 @@ static napi_value GetCallbackThreadsafe(napi_env env, napi_callback_info info)
     return result;
 }
 
+static napi_value PtrFromTypedArray(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value args[1] = {nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    bool isTypedArray = false;
+    napi_is_typedarray(env, args[0], &isTypedArray);
+
+    void* data = nullptr;
+    size_t byteLength = 0;
+    napi_value buffer;
+    size_t byteOffset = 0;
+
+    if (isTypedArray) {
+        napi_get_typedarray_info(env, args[0], nullptr, &byteLength, &data, &buffer, &byteOffset);
+    } else {
+        napi_get_arraybuffer_info(env, args[0], &data, &byteLength);
+        byteOffset = 0;
+    }
+
+    uint64_t ptrValue = reinterpret_cast<uint64_t>(static_cast<uint8_t*>(data) + byteOffset);
+
+    napi_value result;
+    napi_create_double(env, static_cast<double>(ptrValue), &result);
+    return result;
+}
+
+static napi_value GetCallbackPtr(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value args[1] = {nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    int64_t handleValue = 0;
+    napi_get_value_int64(env, args[0], &handleValue);
+    int slotIdx = static_cast<int>(handleValue) - 1;
+
+    double ptrValue;
+    if (slotIdx >= 0 && slotIdx < MAX_CALLBACK_SLOTS && g_callbackSlots[slotIdx].active) {
+        if (g_callbackSlots[slotIdx].threadsafe) {
+            ptrValue = static_cast<double>(reinterpret_cast<uint64_t>(g_trampolines[slotIdx]));
+        } else {
+            ptrValue = static_cast<double>(slotIdx + 1);
+        }
+    } else {
+        ptrValue = 0.0;
+    }
+
+    napi_value result;
+    napi_create_double(env, ptrValue, &result);
+    return result;
+}
+
+static napi_value CallCallbackThreadSafe(napi_env env, napi_callback_info info)
+{
+    size_t argc = 2;
+    napi_value args[2] = {nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    int64_t handleValue = 0;
+    napi_get_value_int64(env, args[0], &handleValue);
+    int slotIdx = static_cast<int>(handleValue) - 1;
+
+    if (slotIdx < 0 || slotIdx >= MAX_CALLBACK_SLOTS || !g_callbackSlots[slotIdx].active) {
+        napi_throw_error(env, nullptr, "invalid or closed callback handle");
+        napi_value result;
+        napi_get_undefined(env, &result);
+        return result;
+    }
+
+    if (!g_callbackSlots[slotIdx].threadsafe || g_callbackSlots[slotIdx].tsfn == nullptr) {
+        napi_throw_error(env, nullptr, "callback is not threadsafe or TSFN is null");
+        napi_value result;
+        napi_get_undefined(env, &result);
+        return result;
+    }
+
+    napi_value cbArg = args[1];
+    napi_status status = napi_call_threadsafe_function(
+        g_callbackSlots[slotIdx].tsfn,
+        &cbArg,
+        napi_tsfn_blocking);
+
+    if (status != napi_ok) {
+        napi_throw_error(env, nullptr, "napi_call_threadsafe_function failed");
+    }
+
+    napi_value result;
+    napi_get_undefined(env, &result);
+    return result;
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
+    g_mainEnv = env;
     napi_property_descriptor desc[] = {
         {"load", nullptr, Load, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -641,6 +857,9 @@ static napi_value Init(napi_env env, napi_value exports)
         {"destroyCallback", nullptr, DestroyCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"invokeCallback", nullptr, InvokeCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getCallbackThreadsafe", nullptr, GetCallbackThreadsafe, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"getCallbackPtr", nullptr, GetCallbackPtr, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"ptr", nullptr, PtrFromTypedArray, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"callCallbackThreadSafe", nullptr, CallCallbackThreadSafe, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;

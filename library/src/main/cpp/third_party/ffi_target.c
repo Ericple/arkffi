@@ -64,3 +64,5 @@ double compute(int mode, double value, const char *name) {
 int32_t compareStrings(const char *a, const char *b) { return strcmp(a, b); }
 
 double weightedSum(int32_t a, double wa, int32_t b, double wb) { return (double)a * wa + (double)b * wb; }
+
+int32_t apply_callback(int32_t (*cb)(int32_t), int32_t arg) { return cb(arg); }

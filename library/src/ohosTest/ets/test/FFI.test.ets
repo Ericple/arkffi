@@ -13,7 +13,7 @@
 *   limitations under the License.
 */
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
+import { describe, beforeAll, it, expect } from '@ohos/hypium';
 import ffi from 'liblibrary.so';
 import { dlopen, FFIType, CString, CFunction, JSCallback } from '../../../main/ets/ffi';
 
@@ -532,12 +532,93 @@ export default function ffiTest() {
         returns: FFIType.int32,
         threadsafe: true,
       });
-      expect(cb.ptr > 0).assertTrue();
+      expect(cb.ptr > 65536).assertTrue();
+      cb.close();
+    })
+
+    it('JSCallback_threadsafe_invoke_after_create', 0, () => {
+      let cb = new JSCallback((x: number): number => x + 1, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+        threadsafe: true,
+      });
+      expect(cb.call(41)).assertEqual(42);
+      expect(cb.call(99)).assertEqual(100);
+      cb.close();
+    })
+
+    it('JSCallback_threadsafe_multiple_calls', 0, () => {
+      let sum: number = 0;
+      let cb = new JSCallback((x: number): number => {
+        sum += x;
+        return sum;
+      }, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+        threadsafe: true,
+      });
+      expect(cb.call(1)).assertEqual(1);
+      expect(cb.call(2)).assertEqual(3);
+      expect(cb.call(3)).assertEqual(6);
+      cb.close();
+    })
+
+    it('JSCallback_threadsafe_via_napi_tsfn', 0, () => {
+      let cb = new JSCallback((x: number): number => x * 10, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+        threadsafe: true,
+      });
+      ffi.callCallbackThreadSafe(cb.getHandle(), 7);
+      cb.close();
+    })
+
+    it('JSCallback_non_threadsafe_cannot_use_tsfn', 0, () => {
+      let cb = new JSCallback((x: number): number => x, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+      });
+      let threw = false;
+      try {
+        ffi.callCallbackThreadSafe(cb.ptr, 1);
+      } catch (_e) {
+        threw = true;
+      }
+      expect(threw).assertTrue();
+      cb.close();
+    })
+
+    it('JSCallback_threadsafe_ptr_is_real_address', 0, () => {
+      let cb = new JSCallback((x: number): number => x * 3, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+        threadsafe: true,
+      });
+      let ptr: number = cb.ptr;
+      expect(ptr > 65536).assertTrue();
+      let fn = CFunction({ args: [FFIType.int32], returns: FFIType.int32, ptr: ptr });
+      let result = fn(7);
+      expect(result).assertEqual(21);
+      fn.close();
+      cb.close();
+    })
+
+    it('FFIType_callback_constant', 0, () => {
+      expect(FFIType.callback).assertEqual('k');
+      expect(FFIType.usize).assertEqual('l');
+    })
+
+    it('JSCallback_ptr_slot_non_threadsafe', 0, () => {
+      let cb = new JSCallback((x: number): number => x, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+      });
+      expect(cb.ptr).assertEqual(cb.getHandle());
       cb.close();
     })
 
     it('External Built Library', 0, () => {
-      let lib1 = dlopen("librvohostest.so", {
+      let lib1 = dlopen(LIB_NAME_TP, {
         hello: { args: [], returns: FFIType.int64 },
       });
 
@@ -545,6 +626,36 @@ export default function ffiTest() {
       const cstr = new CString(ptr);
       expect(cstr.toString()).assertEqual("Hello, World!");
       lib1.close();
+    })
+
+    it('ptr_from_ArrayBuffer', 0, () => {
+      let buf = new ArrayBuffer(256);
+      let p = ffi.ptr(buf);
+      expect(p > 0).assertTrue();
+    })
+
+    it('CString_with_byteOffset', 0, () => {
+      let handle = ffi.load(LIB_NAME);
+      ffi.defineFunction(handle, 'getVersion', '', 'l');
+      let ptr: number = ffi.callBySig(handle, 'getVersion', [], []);
+      let cstr = new CString(ptr, 0);
+      expect(cstr.toString()).assertEqual('1.0.0');
+      ffi.close(handle);
+    })
+
+    it('FFIType_additional_constants', 0, () => {
+      expect(FFIType.uint8_t).assertEqual('i');
+      expect(FFIType.u8).assertEqual('i');
+      expect(FFIType.uint16_t).assertEqual('i');
+      expect(FFIType.u16).assertEqual('i');
+      expect(FFIType.uint32_t).assertEqual('i');
+      expect(FFIType.u32).assertEqual('i');
+      expect(FFIType.int64_t).assertEqual('l');
+      expect(FFIType.uint64_t).assertEqual('l');
+      expect(FFIType.int8_t).assertEqual('c');
+      expect(FFIType.napi_value).assertEqual('p');
+      expect(FFIType.callback).assertEqual('k');
+      expect(FFIType.usize).assertEqual('l');
     })
   })
 }

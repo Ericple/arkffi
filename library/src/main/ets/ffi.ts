@@ -1,17 +1,3 @@
-/*   Copyright [2026] [Guo Tingjin dev@peercat.cn]
-*
-*   Licensed under the Apache License, Version 2.0 (the "License");
-*   you may not use this file except in compliance with the License.
-*   You may obtain a copy of the License at
-*
-*       http:*www.apache.org/licenses/LICENSE-2.0
-*
-*   Unless required by applicable law or agreed to in writing, software
-*   distributed under the License is distributed on an "AS IS" BASIS,
-*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*   See the License for the specific language governing permissions and
-*   limitations under the License.
-*/
 import ffi from 'liblibrary.so';
 
 type LooseFFIDef = {
@@ -32,50 +18,47 @@ export class FFIType {
   static readonly char: 'c' = 'c';
   static readonly int8_t: 'c' = 'c';
   static readonly i8: 'c' = 'c';
-
   static readonly uint8_t: 'i' = 'i';
   static readonly u8: 'i' = 'i';
-
   static readonly int16_t: 'i' = 'i';
   static readonly i16: 'i' = 'i';
-
   static readonly uint16_t: 'i' = 'i';
   static readonly u16: 'i' = 'i';
-
   static readonly int: 'i' = 'i';
   static readonly i32: 'i' = 'i';
   static readonly uint32_t: 'i' = 'i';
   static readonly u32: 'i' = 'i';
-
   static readonly i64: 'l' = 'l';
   static readonly int64_t: 'l' = 'l';
   static readonly uint64_t: 'l' = 'l';
   static readonly u64: 'l' = 'l';
-
   static readonly f64: 'd' = 'd';
   static readonly float: 'f' = 'f';
   static readonly f32: 'f' = 'f';
-
   static readonly bool: 'b' = 'b';
-
   static readonly ptr: 'p' = 'p';
   static readonly pointer: 'p' = 'p';
-
   static readonly void: 'i' = 'i';
-
   static readonly i64_fast: 'l' = 'l';
   static readonly u64_fast: 'l' = 'l';
   static readonly function: 'p' = 'p';
   static readonly napi_env: 'p' = 'p';
   static readonly napi_value: 'p' = 'p';
   static readonly buffer: 'p' = 'p';
+
+  static readonly callback: 'k' = 'k';
+  static readonly usize: 'l' = 'l';
 }
 
 export class CString {
   private ptr: number;
+  private byteOffset: number;
+  private byteLength: number;
 
-  constructor(ptr: number) {
+  constructor(ptr: number, byteOffset?: number, byteLength?: number) {
     this.ptr = ptr;
+    this.byteOffset = byteOffset ?? 0;
+    this.byteLength = byteLength ?? -1;
   }
 
   get length(): number {
@@ -83,7 +66,10 @@ export class CString {
   }
 
   toString(): string {
-    return ffi.readCString(this.ptr);
+    if (this.byteLength >= 0) {
+      return ffi.readCString(this.ptr + this.byteOffset);
+    }
+    return ffi.readCString(this.ptr + this.byteOffset);
   }
 }
 
@@ -98,15 +84,20 @@ export function CFunction(def: { args: string[]; returns: string; ptr: number })
     for (let j = 0; j < def.args.length; j++) {
       if (def.args[j] == 's') {
         strArgs.push(rawArgs[j] as string);
+      } else if (def.args[j] == 'k') {
+        numArgs.push((rawArgs[j] as any).ptr ?? (rawArgs[j] as number));
       } else {
         numArgs.push(rawArgs[j] as number);
       }
     }
     return ffi.callPtr(def.ptr, typeStr, def.returns, numArgs, strArgs);
   };
-  wrapper.close = (): void => {
-  };
+  wrapper.close = (): void => {};
   return wrapper;
+}
+
+export function ptr(buffer: any): number {
+  return ffi.ptr(buffer);
 }
 
 export class JSCallback {
@@ -119,6 +110,10 @@ export class JSCallback {
   }
 
   get ptr(): number {
+    return ffi.getCallbackPtr(this.handle);
+  }
+
+  getHandle(): number {
     return this.handle;
   }
 
@@ -132,6 +127,13 @@ export class JSCallback {
       this.handle = 0;
     }
   }
+}
+
+function extractArg(raw: any, typeCode: string): number {
+  if (typeCode == 'k') {
+    return raw.ptr ?? raw;
+  }
+  return raw;
 }
 
 function joinTypes(types: string[]): string {
@@ -178,7 +180,7 @@ export function dlopen<Fns extends Record<string, LooseFFIDef>>(
           if (def.args[j] == 's') {
             strArgs.push(rawArgs[j] as string);
           } else {
-            numArgs.push(rawArgs[j] as number);
+            numArgs.push(extractArg(rawArgs[j], def.args[j]));
           }
         }
         return ffi.callBySig(handle, name, numArgs, strArgs);

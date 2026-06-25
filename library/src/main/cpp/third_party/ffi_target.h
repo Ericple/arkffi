@@ -34,6 +34,8 @@ int32_t compareStrings(const char* a, const char* b);
 
 double weightedSum(int32_t a, double wa, int32_t b, double wb);
 
+int32_t apply_callback(int32_t (*cb)(int32_t), int32_t arg);
+
 #ifdef __cplusplus
 }
 #endif
