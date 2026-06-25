@@ -25,7 +25,7 @@ arkffi 提供三个抽象层：
 |---|---|
 | **原始 NAPI 桥接** | `load`、`close`、`callMixed`、`callBySig`、`callString`、`readCString`、`getSymbolPtr`、`callPtr` |
 | **`dlopen` 封装** | 声明式 `dlopen()`，支持字典式函数定义和类型化符号 |
-| **CFunction / JSCallback** | 函数指针包装和 JavaScript 回调支持 |
+| **CFunction / JSCallback** | 函数指针包装和 ArkTS 回调支持 |
 
 ### 特性
 
@@ -33,7 +33,7 @@ arkffi 提供三个抽象层：
 - 支持 `int32`、`int64`、`double`、`float`、`bool`、`pointer`、`cstring`
 - 混合参数类型（`int` + `double` + `string` 一次调用）
 - 通过 `CFunction` 支持函数指针
-- 通过 `JSCallback` 支持 JavaScript 回调，可设置 `threadsafe`
+- 通过 `JSCallback` 支持 ArkTS 回调，可设置 `threadsafe`
 - 通过 `CString` 读取 C 字符串
 - TypeScript 泛型支持 IDE 代码补全
 

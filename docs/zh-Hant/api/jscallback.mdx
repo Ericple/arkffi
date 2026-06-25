@@ -1,9 +1,9 @@
 ---
 title: "JSCallback"
-description: "將 JavaScript 函數包裝爲 C 回調"
+description: "將 ArkTS 函數包裝爲 C 回調"
 ---
 
-`JSCallback` 包裝 JavaScript 函數，使其可用於期望函數指針的 C 代碼。
+`JSCallback` 包裝 ArkTS 函數，使其可用於期望函數指針的 C 代碼。
 
 ## 示例
 
@@ -35,7 +35,7 @@ constructor(
 
 | 參數 | 類型 | 默認值 | 說明 |
 |---|---|---|---|
-| `callback` | `Function` | — | 要包裝的 JavaScript 函數 |
+| `callback` | `Function` | — | 要包裝的 ArkTS 函數 |
 | `def.args` | `string[]` | — | C 函數參數類型編碼 |
 | `def.returns` | `string` | — | C 函數返回類型編碼 |
 | `def.threadsafe` | `boolean` | `false` | 是否可從任意線程調用 |
@@ -66,7 +66,7 @@ readonly threadsafe: boolean;
 call(...args: any[]): any;
 ```
 
-調用 JavaScript 回調。
+調用 ArkTS 回調。
 
 ```typescript
 cb.call(7);  // → 70

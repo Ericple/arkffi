@@ -159,7 +159,7 @@ it('External Built Library', 0, () => {
   // 3. 調用函數，獲取 C 字符串指針（一個 64 位內存地址）
   const ptr = lib1.symbols.hello();
 
-  // 4. 通過 CString 將指針轉換爲 JavaScript 字符串
+  // 4. 通過 CString 將指針轉換爲 ArkTS 字符串
   //    CString 內部使用 readCString 讀取 null 結尾的 C 字符串
   const cstr = new CString(ptr);
 

@@ -25,7 +25,7 @@ arkffi 提供三個抽象層：
 |---|---|
 | **原始 NAPI 橋接** | `load`、`close`、`callMixed`、`callBySig`、`callString`、`readCString`、`getSymbolPtr`、`callPtr` |
 | **`dlopen` 封裝** | 聲明式 `dlopen()`，支持字典式函數定義和類型化符號 |
-| **CFunction / JSCallback** | 函數指針包裝和 JavaScript 回調支持 |
+| **CFunction / JSCallback** | 函數指針包裝和 ArkTS 回調支持 |
 
 ### 特性
 
@@ -33,7 +33,7 @@ arkffi 提供三個抽象層：
 - 支持 `int32`、`int64`、`double`、`float`、`bool`、`pointer`、`cstring`
 - 混合參數類型（`int` + `double` + `string` 一次調用）
 - 通過 `CFunction` 支持函數指針
-- 通過 `JSCallback` 支持 JavaScript 回調，可設置 `threadsafe`
+- 通過 `JSCallback` 支持 ArkTS 回調，可設置 `threadsafe`
 - 通過 `CString` 讀取 C 字符串
 - TypeScript 泛型支持 IDE 代碼補全
 
@@ -64,10 +64,6 @@ liblibrary.so ──dlopen/dlsym/dlclose──► libffi_target.so (或任意 .s
 
 ## 安裝
 
-```json
-{
-  "dependencies": {
-    "library": "file:./library"
-  }
-}
+```bash
+ohpm install arkffi
 ```

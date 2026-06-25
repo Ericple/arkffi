@@ -159,7 +159,7 @@ it('External Built Library', 0, () => {
   // 3. 调用函数，获取 C 字符串指针（一个 64 位内存地址）
   const ptr = lib1.symbols.hello();
 
-  // 4. 通过 CString 将指针转换为 JavaScript 字符串
+  // 4. 通过 CString 将指针转换为 ArkTS 字符串
   //    CString 内部使用 readCString 读取 null 结尾的 C 字符串
   const cstr = new CString(ptr);
 
