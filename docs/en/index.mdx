@@ -1,0 +1,69 @@
+---
+title: "arkffi"
+description: "A Foreign Function Interface library for ArkTS / HarmonyOS"
+---
+
+arkffi lets you call C functions from native `.so` libraries directly from ArkTS — no NAPI bindings required.
+
+<CardGroup cols={3}>
+  <Card title="Getting Started" icon="rocket" href="/en/getting-started">
+    Install, configure, and call your first C function in minutes.
+  </Card>
+  <Card title="API Reference" icon="book-open" href="/en/api/dlopen">
+    Complete reference for dlopen, FFIType, CString, CFunction, and JSCallback.
+  </Card>
+  <Card title="Guides" icon="compass" href="/en/guides/mixed-types">
+    Deep dives into mixed types, function pointers, callbacks, and external libraries.
+  </Card>
+</CardGroup>
+
+## Overview
+
+arkffi provides three layers of abstraction:
+
+| Layer | Description |
+|---|---|
+| **Raw NAPI Bridge** | `load`, `close`, `callMixed`, `callBySig`, `callString`, `readCString`, `getSymbolPtr`, `callPtr` |
+| **`dlopen` wrapper** | Declarative `dlopen()` with dictionary-style function definitions and typed symbols |
+| **CFunction / JSCallback** | Function pointer wrapping and JavaScript callback support |
+
+### Features
+
+- Call any exported C function from a `.so` library
+- Supports `int32`, `int64`, `double`, `float`, `bool`, `pointer`, `cstring`, `callback`
+- Mixed parameter types (`int` + `double` + `string` in one call)
+- Function pointer support via `CFunction`
+- JavaScript callbacks via `JSCallback` with optional `threadsafe` mode
+- C string reading via `CString`
+- TypeScript generics for IDE code completion
+
+## Quick Start
+
+```typescript
+import { dlopen, FFIType, CString } from 'arkffi';
+
+const lib = dlopen('libffi_target.so', {
+  add:        { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+  getVersion: { args: [],                                returns: FFIType.int64 },
+});
+
+lib.symbols.add(2.0, 3.0);
+new CString(lib.symbols.getVersion()).toString();
+
+lib.close();
+```
+
+## Architecture
+
+```
+ArkTS / TypeScript        dlopen / CFunction / JSCallback / CString
+      │                              │
+      ▼                              ▼ (NAPI)
+liblibrary.so ──dlopen/dlsym/dlclose──► libffi_target.so (or any .so)
+```
+
+## Installation
+
+```bash
+ohpm install arkffi
+```

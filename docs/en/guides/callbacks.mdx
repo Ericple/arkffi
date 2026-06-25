@@ -1,13 +1,15 @@
 ---
-title: "回调"
-description: "通过 JSCallback 将 ArkTS 函数传递给 C 代码"
+title: "Callbacks"
+description: "Passing TypeScript functions to C code via JSCallback"
 ---
 
-`JSCallback` 包装 ArkTS 函数，使其可作为 C 函数指针使用。
+`JSCallback` wraps TypeScript functions so they can be used as C function pointers.
 
-## 基本用法
+## Basic Usage
 
 ```typescript
+import { JSCallback, FFIType } from 'arkffi';
+
 const cb = new JSCallback(
   (a: number, b: number): number => a + b,
   { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
@@ -16,7 +18,7 @@ const cb = new JSCallback(
 cb.call(2, 3); // → 5
 ```
 
-## 闭包捕获
+## Closure Capture
 
 ```typescript
 function makeAdder(x: number): JSCallback {
@@ -31,9 +33,9 @@ add5.call(3); // → 8
 add5.close();
 ```
 
-## 线程安全
+## Thread Safety
 
-可能从不同线程调用时设置 `threadsafe: true`：
+Set `threadsafe: true` for callbacks that may be invoked from a different thread:
 
 ```typescript
 const cb = new JSCallback(
@@ -46,9 +48,9 @@ cb.call(5);    // → 10
 cb.close();
 ```
 
-### 线程安全与 C 函数指针
+### Thread-Safe C Function Pointers
 
-`threadsafe: true` 时，`cb.ptr` 返回一个**真实的 C 函数指针**（蹦床地址），可直接传给原生 C 代码：
+When `threadsafe: true`, `cb.ptr` returns a **real C function pointer** (trampoline address) that can be passed directly to native C code:
 
 ```typescript
 const cb = new JSCallback((x: number): number => x * 3, {
@@ -57,31 +59,28 @@ const cb = new JSCallback((x: number): number => x * 3, {
   threadsafe: true,
 });
 
-// cb.ptr 是真实函数地址，可通过 CFunction 包装后调用
 const fn = CFunction({ args: [FFIType.int32], returns: FFIType.int32, ptr: cb.ptr });
 fn(7); // → 21
 fn.close();
 cb.close();
 ```
 
-内部机制：`JSCallback` 创建时通过 `napi_create_threadsafe_function` 创建 TSFN，同时分配 16 个预编译的本机蹦床函数，每个槽位对应一个独立函数地址。`cb.ptr` 通过 `getCallbackPtr` 返回该地址，原生 C 代码调用该地址时会先通过 `TrampolineDispatcher` 同步调用 ArkTS 回调并返回结果。
+Internally, `napi_create_threadsafe_function` creates a TSFN, while 16 pre-compiled native trampoline functions are allocated — one per callback slot. `cb.ptr` returns the trampoline address via `getCallbackPtr`. When native C code calls this address, `TrampolineDispatcher` synchronously invokes the TypeScript callback and returns the result.
 
-## 清理
+## Cleanup
 
-始终调用 `close()` 释放资源：
+Always call `close()` to release resources:
 
 ```typescript
 cb.close();
-cb.call(1); // 抛出异常：句柄无效
+cb.call(1); // throws: invalid handle
 ```
 
-## 多个回调
+## Multiple Callbacks
 
 ```typescript
-import { JSCallback, FFIType } from 'arkffi';
-
-const add = new JSCallback(fn1, { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 });
-const mul = new JSCallback(fn2, { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 });
+const add = new JSCallback(fn1, { args: ['i', 'i'], returns: 'i' });
+const mul = new JSCallback(fn2, { args: ['i', 'i'], returns: 'i' });
 
 add.call(3, 4); // 7
 mul.call(3, 4); // 12
@@ -90,7 +89,7 @@ add.close();
 mul.close();
 ```
 
-## 传递给原生函数
+## Passing to Native Functions
 
 ```typescript
 // C: void foreach(int* arr, int len, void (*cb)(int));

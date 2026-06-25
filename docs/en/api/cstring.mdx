@@ -1,0 +1,71 @@
+---
+title: "CString"
+description: "Read a C string from a raw pointer"
+---
+
+`CString` wraps a raw C string pointer (`const char*`) and provides safe read access.
+
+## Example
+
+```typescript
+import { dlopen, FFIType, CString } from 'arkffi';
+
+const lib = dlopen('libffi_target.so', {
+  getVersion: { args: [], returns: FFIType.int64 },
+});
+
+const ptr: number = lib.symbols.getVersion();
+const cstr = new CString(ptr);
+
+cstr.toString(); // → "1.0.0"
+cstr.length;     // → 5
+
+lib.close();
+```
+
+## Constructor
+
+```typescript
+constructor(ptr: number, byteOffset?: number, byteLength?: number);
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `ptr` | `number` | — | Memory address of the C string |
+| `byteOffset` | `number` | `0` | Skip N bytes before reading |
+| `byteLength` | `number` | auto-detect (null-terminated) | Explicit read length |
+
+```typescript
+const cstr = new CString(ptr, 0, 5);
+cstr.toString(); // reads first 5 bytes
+```
+
+## Properties
+
+### `length`
+
+```typescript
+get length(): number;
+```
+
+Returns the length of the C string in characters.
+
+## Methods
+
+### `toString()`
+
+```typescript
+toString(): string;
+```
+
+Reads the C string and returns it as a TypeScript string.
+
+## Null Pointers
+
+Passing `0` is safe and returns an empty string:
+
+```typescript
+const cstr = new CString(0);
+cstr.toString(); // → ""
+cstr.length;     // → 0
+```

@@ -1,0 +1,89 @@
+---
+title: "Complete Example"
+description: "All arkffi features working together"
+---
+
+## C Library
+
+```c
+double add(double a, double b) { return a + b; }
+
+int gcd(int a, int b) {
+    while (b != 0) { int t = b; b = a % b; a = t; }
+    return a;
+}
+
+long long factorial(int n) {
+    long long r = 1;
+    for (int i = 2; i <= n; i++) r *= i;
+    return r;
+}
+
+double compute(int mode, double value, const char* name) {
+    if (strcmp(name, "square") == 0) return value * value;
+    if (strcmp(name, "half") == 0)   return value / 2.0;
+    return value;
+}
+
+const char* getVersion(void) { return "1.0.0"; }
+```
+
+## ArkTS Usage
+
+```typescript
+import ffi from 'liblibrary.so';
+import { dlopen, FFIType, CString, CFunction, JSCallback } from 'arkffi';
+
+const LIB = 'libffi_target.so';
+
+// ── dlopen ──
+const lib = dlopen(LIB, {
+  add:        { args: [FFIType.double, FFIType.double],  returns: FFIType.double },
+  gcd:        { args: [FFIType.int32,  FFIType.int32],   returns: FFIType.int32 },
+  factorial:  { args: [FFIType.int32],                    returns: FFIType.int64 },
+  compute:    { args: [FFIType.int32, FFIType.double, FFIType.CString], returns: FFIType.double },
+  getVersion: { args: [],                                  returns: FFIType.int64 },
+});
+
+const sum = lib.symbols.add(2.0, 3.0);              // 5.0
+const g   = lib.symbols.gcd(12, 18);                 // 6
+const sq  = lib.symbols.compute(0, 4.0, 'square');  // 16.0
+const ptr = lib.symbols.getVersion();
+new CString(ptr).toString();                         // "1.0.0"
+
+// ── CFunction ──
+const addPtr = ffi.getSymbolPtr(handle, 'add');
+const addFn  = CFunction({
+  args: [FFIType.double, FFIType.double],
+  returns: FFIType.double, ptr: addPtr,
+});
+addFn(7.0, 8.0);                                    // 15.0
+addFn.close();
+
+// ── JSCallback ──
+const cb = new JSCallback(
+  (a: number, b: number): number => a + b,
+  { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+);
+cb.call(100, 200);                                   // 300
+cb.close();
+
+// ── Raw bridge ──
+const h = ffi.load(LIB);
+ffi.defineFunction(h, 'divide', 'dd', 'd');
+ffi.callBySig(h, 'divide', [10.0, 3.0], []);
+ffi.close(h);
+
+lib.close();
+```
+
+## Running Tests
+
+```bash
+# Build test HAP
+hvigorw --mode module -p module=library@ohosTest genOnDeviceTestHap
+
+# Install and run
+hdc install library/build/default/outputs/ohosTest/library-ohosTest-signed.hap
+hdc shell aa test -b <bundleName> -m library_test -s unittest OpenHarmonyTestRunner
+```

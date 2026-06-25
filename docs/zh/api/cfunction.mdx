@@ -42,9 +42,22 @@ function CFunction(def: {
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
-| `def.args` | `string[]` | C 函数参数类型编码 |
+| `def.args` | `string[]` | C 函数参数类型编码，支持 `FFIType.callback`（调用时自动从 JSCallback 中提取 `.ptr`） |
 | `def.returns` | `string` | C 函数返回类型编码 |
 | `def.ptr` | `number` | 原始函数指针地址 |
+
+## 回调类型参数
+
+当参数类型为 `FFIType.callback`（`'k'`）时，传入的 JSCallback 会被自动提取其 `.ptr`：
+
+```typescript
+let fn = CFunction({
+  args: [FFIType.callback, FFIType.int32],
+  returns: FFIType.int32,
+  ptr: applyPtr,
+});
+fn(cb, 21); // cb.ptr 自动作为第一个参数传入
+```
 
 ## 获取指针
 

@@ -1,0 +1,129 @@
+---
+title: "JSCallback"
+description: "Wrap a TypeScript function for use as a C callback"
+---
+
+`JSCallback` wraps a TypeScript function so it can be passed to C code that expects a function pointer.
+
+## Example
+
+```typescript
+import { JSCallback, FFIType } from 'arkffi';
+
+const cb = new JSCallback(
+  (a: number, b: number): number => a + b,
+  { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+);
+
+cb.call(2, 3); // → 5
+cb.ptr;        // → slot handle or trampoline address
+cb.close();
+```
+
+## Constructor
+
+```typescript
+constructor(
+  callback: (...args: any[]) => any,
+  def: {
+    args: string[];
+    returns: string;
+    threadsafe?: boolean;
+  },
+);
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `callback` | `Function` | — | TypeScript function to wrap |
+| `def.args` | `string[]` | — | C function argument type codes |
+| `def.returns` | `string` | — | C function return type code |
+| `def.threadsafe` | `boolean` | `false` | Safe to call from any thread |
+
+## Properties
+
+### `ptr`
+
+```typescript
+get ptr(): number;
+```
+
+Returns a function pointer that can be passed to native C code.
+- **Non-threadsafe**: returns a slot handle (small integer).
+- **Threadsafe**: returns a real executable trampoline address.
+
+### `getHandle()`
+
+```typescript
+getHandle(): number;
+```
+
+Returns the internal slot handle, used for `ffi.invokeCallback()` and `ffi.callCallbackThreadSafe()`.
+
+### `threadsafe`
+
+```typescript
+readonly threadsafe: boolean;
+```
+
+Whether the callback was created with thread-safe mode.
+
+## Methods
+
+### `call()`
+
+```typescript
+call(...args: any[]): any;
+```
+
+Invokes the TypeScript callback.
+
+```typescript
+cb.call(7);  // → 70
+```
+
+### `close()`
+
+```typescript
+close(): void;
+```
+
+Releases the callback resources.
+
+```typescript
+cb.close();
+cb.call(1); // throws
+```
+
+## Thread-Safe Callbacks
+
+```typescript
+const cb = new JSCallback(fn, {
+  args: [FFIType.int32],
+  returns: FFIType.double,
+  threadsafe: true,
+});
+cb.threadsafe; // → true
+```
+
+When `threadsafe: true`, `cb.ptr` returns a real C function pointer (trampoline) that can be passed directly to native C functions:
+
+```typescript
+const fn = CFunction({ args: [FFIType.int32], returns: FFIType.int32, ptr: cb.ptr });
+fn(7); // → 21
+fn.close();
+```
+
+## Closure Capture
+
+```typescript
+let factor = 10;
+const cb = new JSCallback(
+  (x: number): number => x * factor,
+  { args: [FFIType.int32], returns: FFIType.int32 },
+);
+cb.call(5); // → 50
+factor = 20;
+cb.call(5); // → 100
+cb.close();
+```

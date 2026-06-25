@@ -1,13 +1,13 @@
 ---
 title: "FFIType"
-description: "C 函數定義中的類型常量"
+description: "Type constants for C function definitions"
 ---
 
-`FFIType` 提供函數定義中使用的類型常量。
+`FFIType` provides type constants used in function definitions.
 
-## 常量表
+## Constants
 
-| 常量 | 編碼 | ArkTS 類型 | C 類型 |
+| Constant | Code | TS Type | C Type |
 |---|---|---|---|
 | `FFIType.char` / `int8_t` / `i8` | `c` | `number` | `char` / `int8_t` |
 | `FFIType.uint8_t` / `u8` | `i` | `number` | `uint8_t` |
@@ -20,10 +20,10 @@ description: "C 函數定義中的類型常量"
 | `FFIType.bool` | `b` | `number` | `bool` |
 | `FFIType.CString` | `s` | `string` | `const char*` |
 | `FFIType.ptr` / `pointer` / `function` / `buffer` | `p` | `number` | `void*` |
-| `FFIType.callback` | `k` | `JSCallback` | `int32_t (*)(int32_t)`（函數指針） |
+| `FFIType.callback` | `k` | `JSCallback` | `int32_t (*)(int32_t)` |
 | `FFIType.usize` | `l` | `number` | `size_t` / `uintptr_t` |
 
-## 用法
+## Usage
 
 ```typescript
 import { FFIType } from 'arkffi';
@@ -33,16 +33,16 @@ const def = {
   returns: FFIType.double,
 };
 
-// 也可使用字符串字面量（等價的簡寫形式）
+// String literals are also accepted (shorthand):
 // args: ['i', 'd', 's']
 // returns: 'd'
 ```
 
-## ARM64 寄存器映射
+## ARM64 Register Mapping
 
-| C 類型 | ArkTS 類型 | 寄存器 |
+| C Type | TS Type | Register |
 |---|---|---|
 | `int32_t`, `bool`, `char` | `number` | x0-x7 |
 | `int64_t`, `uint64_t`, `void*` | `number` | x0-x7 |
 | `float`, `double` | `number` | v0-v7 |
-| `const char*` | `string` | x0-x7（指針） |
+| `const char*` | `string` | x0-x7 (pointer) |

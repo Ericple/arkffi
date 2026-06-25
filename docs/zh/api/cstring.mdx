@@ -26,10 +26,21 @@ lib.close();
 ## 构造函数
 
 ```typescript
-constructor(ptr: number);
+constructor(ptr: number, byteOffset?: number, byteLength?: number);
 ```
 
-从原始内存地址创建 `CString`。指针必须指向有效的 null 结尾 C 字符串。
+| 参数 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `ptr` | `number` | — | C 字符串的内存地址 |
+| `byteOffset` | `number` | `0` | 跳过前 N 个字节再开始读取 |
+| `byteLength` | `number` | 自动检测 null 结尾 | 显式指定读取长度 |
+
+从原始内存地址创建 `CString`。指针必须指向有效的 C 字符串。可选地指定偏移量和长度。
+
+```typescript
+const cstr = new CString(ptr, 0, 5);
+cstr.toString(); // 读取前 5 个字节
+```
 
 ## 属性
 

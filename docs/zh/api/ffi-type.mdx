@@ -20,6 +20,8 @@ description: "C 函数定义中的类型常量"
 | `FFIType.bool` | `b` | `number` | `bool` |
 | `FFIType.CString` | `s` | `string` | `const char*` |
 | `FFIType.ptr` / `pointer` / `function` / `buffer` | `p` | `number` | `void*` |
+| `FFIType.callback` | `k` | `JSCallback` | `int32_t (*)(int32_t)`（函数指针） |
+| `FFIType.usize` | `l` | `number` | `size_t` / `uintptr_t` |
 
 ## 用法
 

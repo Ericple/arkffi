@@ -88,6 +88,45 @@
             ]
           }
         ]
+      },
+      {
+        "language": "en",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "en/index",
+              "en/getting-started"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "en/api/dlopen",
+              "en/api/library",
+              "en/api/ffi-type",
+              "en/api/cstring",
+              "en/api/cfunction",
+              "en/api/jscallback",
+              "en/api/ffi-bridge"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "en/guides/mixed-types",
+              "en/guides/function-pointers",
+              "en/guides/callbacks",
+              "en/guides/external-library"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "en/examples/complete"
+            ]
+          }
+        ]
       }
     ]
   },

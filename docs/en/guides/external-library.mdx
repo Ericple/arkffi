@@ -1,0 +1,118 @@
+---
+title: "External Pre-built Libraries"
+description: "Integrate externally compiled .so libraries into arkffi"
+---
+
+This guide demonstrates how to integrate a C/C++ library compiled externally (e.g., with CLion or CMake) into an arkffi project and call its functions via `dlopen`.
+
+## Overview
+
+1. Create a C/C++ library project
+2. Cross-compile for HarmonyOS `arm64-v8a` using the NDK
+3. Place the compiled `.so` into `library/libs/arm64-v8a/`
+4. Modify `CMakeLists.txt` to import the pre-built library
+5. Load and call it from ArkTS via `dlopen`
+
+---
+
+## 1. Create the External Library
+
+**Source** `library.cpp`:
+
+```c
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+    const char* hello(void) {
+        return "Hello, World!";
+    }
+
+#ifdef __cplusplus
+}
+#endif
+```
+
+<Note>
+`extern "C"` prevents C++ name mangling, ensuring `dlsym("hello")` can find the symbol. Without it, the symbol would be mangled to `_Z5hellov` and `dlopen` would fail.
+</Note>
+
+**CMakeLists.txt**:
+
+```cmake
+cmake_minimum_required(VERSION 3.3)
+project(rvohostest)
+set(CMAKE_CXX_STANDARD 14)
+add_library(rvohostest SHARED library.cpp)
+```
+
+## 2. Cross-Compile for HarmonyOS
+
+```bash
+export TOOLCHAIN=/path/to/ohos-sdk/native/llvm
+export SYSROOT=/path/to/ohos-sdk/native/sysroot
+
+$TOOLCHAIN/bin/aarch64-linux-ohos-clang++ \
+  --sysroot=$SYSROOT \
+  -fPIC -shared \
+  -o librvohostest.so \
+  library.cpp
+```
+
+## 3. Place the Output
+
+```
+library/libs/arm64-v8a/librvohostest.so
+```
+
+## 4. Modify CMakeLists.txt
+
+In `library/src/main/cpp/CMakeLists.txt`, add the pre-built `.so` as an `IMPORTED` target:
+
+```cmake
+add_library(rvohostest SHARED IMPORTED)
+set_target_properties(rvohostest PROPERTIES
+  IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/${OHOS_ARCH}/librvohostest.so
+)
+
+add_library(library SHARED napi_init.cpp)
+target_link_libraries(library PUBLIC libace_napi.z.so rvohostest)
+```
+
+| Config | Description |
+|---|---|
+| `SHARED IMPORTED` | Declares a pre-built shared library |
+| `IMPORTED_LOCATION` | Points to the `.so` file; `${OHOS_ARCH}` resolves to `arm64-v8a` or `x86_64` |
+| `target_link_libraries` | Links the external library into `library`, packaging it into the HAP |
+
+## 5. Call from ArkTS
+
+```typescript
+import { dlopen, FFIType, CString } from 'arkffi';
+
+it('External Built Library', 0, () => {
+  let lib1 = dlopen("librvohostest.so", {
+    hello: { args: [], returns: FFIType.int64 },
+  });
+
+  const ptr = lib1.symbols.hello();
+  const cstr = new CString(ptr);
+  expect(cstr.toString()).assertEqual("Hello, World!");
+  lib1.close();
+});
+```
+
+<Warning>
+- Functions returning `const char*` **must** use `returns: FFIType.int64` (to get the pointer), not `FFIType.CString`.
+- Use `CString` to read the actual string content from the pointer.
+- Ensure the library uses `extern "C"` to avoid name mangling.
+</Warning>
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---|---|---|
+| `dlsym failed: Symbol not found` | C++ name mangling | Add `extern "C"` in source |
+| `Handle is invalid` | `.so` not packaged into HAP | Check `IMPORTED_LOCATION` path and `target_link_libraries` |
+| `cannot locate symbol` | Wrong toolchain for compilation | Use HarmonyOS NDK, not host system compiler |
+| Call returns empty string | Wrong return type | Use `FFIType.int64`, not `FFIType.CString` |

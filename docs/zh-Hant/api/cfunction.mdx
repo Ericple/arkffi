@@ -42,9 +42,22 @@ function CFunction(def: {
 
 | 參數 | 類型 | 說明 |
 |---|---|---|
-| `def.args` | `string[]` | C 函數參數類型編碼 |
+| `def.args` | `string[]` | C 函數參數類型編碼，支持 `FFIType.callback`（調用時自動從 JSCallback 中提取 `.ptr`） |
 | `def.returns` | `string` | C 函數返回類型編碼 |
 | `def.ptr` | `number` | 原始函數指針地址 |
+
+## 回調類型參數
+
+當參數類型爲 `FFIType.callback`（`'k'`）時，傳入的 JSCallback 會被自動提取其 `.ptr`：
+
+```typescript
+let fn = CFunction({
+  args: [FFIType.callback, FFIType.int32],
+  returns: FFIType.int32,
+  ptr: applyPtr,
+});
+fn(cb, 21); // cb.ptr 自動作爲第一個參數傳入
+```
 
 ## 獲取指針
 

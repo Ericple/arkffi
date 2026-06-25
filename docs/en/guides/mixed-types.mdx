@@ -1,0 +1,67 @@
+---
+title: "Mixed Parameter Types"
+description: "Calling C functions with mixed int, double, and string parameters"
+---
+
+C functions often accept parameters of different types. arkffi handles this by separating numeric and string arguments into two arrays.
+
+## Signature Encoding
+
+| Code | C Type |
+|---|---|
+| `i` | `int32_t`, `int`, `bool`, `char` |
+| `l` | `int64_t`, `uint64_t`, `void*` |
+| `d` | `double`, `float` |
+| `s` | `const char*` |
+
+For a function like:
+
+```c
+double compute(int mode, double value, const char* name);
+```
+
+The type string is `"ids"` and the return type is `"d"`.
+
+## Using `callMixed`
+
+```typescript
+const h = ffi.load('libffi_target.so');
+
+const result = ffi.callMixed(
+  h, 'compute',
+  'ids',       // arg types: int32, double, CString
+  'd',         // return type: double
+  [0, 4.0],    // numeric args
+  ['square'],  // string args
+);
+
+ffi.close(h);
+```
+
+## Using `dlopen`
+
+```typescript
+const lib = dlopen('libffi_target.so', {
+  compute: {
+    args: [FFIType.int32, FFIType.double, FFIType.CString],
+    returns: FFIType.double,
+  },
+});
+
+lib.symbols.compute(0, 4.0, 'square');
+```
+
+## Supported Signatures
+
+| Signature | C Function |
+|---|---|
+| `id` | `double fn(int32_t, double)` |
+| `di` | `double fn(double, int32_t)` |
+| `ids` | `double fn(int32_t, double, const char*)` |
+| `sid` | `double fn(const char*, int32_t, double)` |
+| `isd` | `double fn(int32_t, const char*, double)` |
+| `iid` | `double fn(int32_t, int32_t, double)` |
+| `idi` | `double fn(int32_t, double, int32_t)` |
+| `idid` | `double fn(int32_t, double, int32_t, double)` |
+| `ss` | `int32_t fn(const char*, const char*)` |
+| `s` | `double fn(const char*)` |

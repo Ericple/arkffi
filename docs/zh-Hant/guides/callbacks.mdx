@@ -46,6 +46,26 @@ cb.call(5);    // → 10
 cb.close();
 ```
 
+### 線程安全與 C 函數指針
+
+`threadsafe: true` 時，`cb.ptr` 返回一個**真實的 C 函數指針**（蹦牀地址），可直接傳給原生 C 代碼：
+
+```typescript
+const cb = new JSCallback((x: number): number => x * 3, {
+  args: [FFIType.int32],
+  returns: FFIType.int32,
+  threadsafe: true,
+});
+
+// cb.ptr 是真實函數地址，可通過 CFunction 包裝後調用
+const fn = CFunction({ args: [FFIType.int32], returns: FFIType.int32, ptr: cb.ptr });
+fn(7); // → 21
+fn.close();
+cb.close();
+```
+
+內部機制：`JSCallback` 創建時通過 `napi_create_threadsafe_function` 創建 TSFN，同時分配 16 個預編譯的本機蹦牀函數，每個槽位對應一個獨立函數地址。`cb.ptr` 通過 `getCallbackPtr` 返回該地址，原生 C 代碼調用該地址時會先通過 `TrampolineDispatcher` 同步調用 ArkTS 回調並返回結果。
+
 ## 清理
 
 始終調用 `close()` 釋放資源：

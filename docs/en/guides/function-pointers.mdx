@@ -1,0 +1,61 @@
+---
+title: "Function Pointers"
+description: "Working with raw C function pointers via CFunction"
+---
+
+Some C APIs expect function pointers as arguments. arkffi provides `CFunction` to wrap them.
+
+## Obtaining a Pointer
+
+```typescript
+const handle = ffi.load('libffi_target.so');
+const ptr = ffi.getSymbolPtr(handle, 'add');
+// ptr is the memory address of the C function
+```
+
+## Creating a CFunction Wrapper
+
+```typescript
+import { CFunction, FFIType } from 'arkffi';
+
+const add = CFunction({
+  args: [FFIType.double, FFIType.double],
+  returns: FFIType.double,
+  ptr: ptr,
+});
+
+add(2.0, 3.0); // → 5.0
+add.close();
+```
+
+## Lifecycle
+
+Always close wrappers when done:
+
+```typescript
+const fn = CFunction({ ... });
+fn();
+fn.close();
+```
+
+## Passing to C APIs
+
+```typescript
+// C: void sort(int* arr, int (*cmp)(int, int));
+const cmp = CFunction({ args: ['i', 'i'], returns: 'i', ptr: cmpPtr });
+ffi.callMixed(handle, 'sort', 'ip', 'v', [arrPtr, cmp.ptr], []);
+```
+
+## Using JSCallback Instead
+
+For TypeScript-to-C callbacks, use `JSCallback`:
+
+```typescript
+const cmp = new JSCallback(
+  (a: number, b: number): number => a - b,
+  { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+);
+
+ffi.callMixed(handle, 'sort', 'ip', 'v', [arrPtr, cmp.ptr], []);
+cmp.close();
+```

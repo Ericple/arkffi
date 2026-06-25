@@ -1,0 +1,62 @@
+---
+title: "dlopen"
+description: "Load a shared library with typed function definitions"
+---
+
+`dlopen` loads a shared library and returns a [`Library`](/en/api/library) instance with typed symbols.
+
+## Syntax
+
+```typescript
+function dlopen<Fns extends Record<string, FFIFunction>>(
+  libName: string,
+  defs: Fns,
+): Library<Fns>;
+```
+
+## Example
+
+```typescript
+import { dlopen, FFIType } from 'arkffi';
+
+const lib = dlopen('libffi_target.so', {
+  add:     { args: [FFIType.double, FFIType.double],     returns: FFIType.double },
+  compute: { args: [FFIType.int32, FFIType.double, FFIType.CString], returns: FFIType.double },
+});
+
+lib.symbols.add(2.0, 3.0);
+lib.symbols.compute(0, 4.0, 'square');
+lib.close();
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `libName` | `string` | Path or name of the `.so` library |
+| `defs` | `Record<string, FFIFunction>` | Map of function names to type definitions |
+
+## FFIFunction
+
+```typescript
+interface FFIFunction {
+  args: string[];        // Parameter type codes
+  returns: string;       // Return type code
+  threadsafe?: boolean;  // For JSCallback definitions
+}
+```
+
+## Type Inference
+
+`dlopen` uses TypeScript generics to infer the shape of `symbols`, providing IDE autocompletion for all defined function names.
+
+```typescript
+const lib = dlopen('lib.so', {
+  myFunc: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+});
+lib.symbols.myFunc(2.0, 3.0); // autocompleted
+```
+
+## Return Value
+
+Returns a [`Library`](/en/api/library) instance with typed `symbols`.

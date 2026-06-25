@@ -1,17 +1,17 @@
 ---
-title: "原始 NAPI 橋接"
-description: "底層 NAPI 函數的直接訪問"
+title: "Raw NAPI Bridge"
+description: "Direct access to the underlying NAPI functions"
 ---
 
-原始橋接提供對 `liblibrary.so` 導出的 NAPI 函數的直接訪問。
+The raw bridge provides direct access to the NAPI functions exported from `liblibrary.so`.
 
-## 導入
+## Import
 
 ```typescript
 import ffi from 'liblibrary.so';
 ```
 
-## API 參考
+## API Reference
 
 ### `load()`
 
@@ -19,7 +19,7 @@ import ffi from 'liblibrary.so';
 function load(libName: string): bigint;
 ```
 
-調用 `dlopen()` 打開庫。返回 `bigint` 句柄。
+Calls `dlopen()` on the given library. Returns a `bigint` handle.
 
 ```typescript
 const handle = ffi.load('libffi_target.so');
@@ -31,7 +31,7 @@ const handle = ffi.load('libffi_target.so');
 function close(handle: bigint): void;
 ```
 
-調用 `dlclose()` 釋放庫句柄。
+Calls `dlclose()` on the library handle.
 
 ### `defineFunction()`
 
@@ -39,7 +39,7 @@ function close(handle: bigint): void;
 function defineFunction(handle: bigint, funcName: string, argTypes: string, returnType: string): void;
 ```
 
-通過 `dlsym()` 解析函數並註冊類型簽名。
+Resolves a function via `dlsym()` and registers its type signature.
 
 ```typescript
 ffi.defineFunction(handle, 'add', 'dd', 'd');
@@ -51,7 +51,7 @@ ffi.defineFunction(handle, 'add', 'dd', 'd');
 function callBySig(handle: bigint, funcName: string, numArgs: number[], strArgs: string[]): number;
 ```
 
-調用之前註冊的函數。
+Calls a previously registered function.
 
 ```typescript
 ffi.callBySig(handle, 'add', [2.0, 3.0], []);
@@ -63,7 +63,7 @@ ffi.callBySig(handle, 'add', [2.0, 3.0], []);
 function callMixed(handle: bigint, funcName: string, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): number;
 ```
 
-一站式調用——`dlsym()` 和類型分發合併爲一次調用。
+One-shot call — `dlsym()` + type dispatch in a single call.
 
 ```typescript
 ffi.callMixed(handle, 'compute', 'ids', 'd', [0, 4.0], ['square']);
@@ -75,7 +75,7 @@ ffi.callMixed(handle, 'compute', 'ids', 'd', [0, 4.0], ['square']);
 function callString(handle: bigint, funcName: string): string;
 ```
 
-調用返回 `const char*` 的 C 函數。
+Calls a C function returning `const char*`.
 
 ```typescript
 ffi.callString(handle, 'getVersion'); // → "1.0.0"
@@ -87,7 +87,7 @@ ffi.callString(handle, 'getVersion'); // → "1.0.0"
 function readCString(ptr: number): string;
 ```
 
-從原始指針讀取 null 結尾的 C 字符串。
+Reads a null-terminated C string from a raw pointer.
 
 ### `callPtr()`
 
@@ -95,7 +95,7 @@ function readCString(ptr: number): string;
 function callPtr(ptr: number, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): number;
 ```
 
-通過原始函數指針調用，跳過 `dlsym()`。
+Calls a function by its raw pointer, skipping `dlsym()`.
 
 ### `getSymbolPtr()`
 
@@ -103,7 +103,7 @@ function callPtr(ptr: number, argTypes: string, returnType: string, numArgs: num
 function getSymbolPtr(handle: bigint, funcName: string): number;
 ```
 
-返回符號的原始函數指針。
+Returns the raw function pointer for a symbol.
 
 ### `createCallback()`
 
@@ -111,7 +111,7 @@ function getSymbolPtr(handle: bigint, funcName: string): number;
 function createCallback(callback: Function, argTypes: string, returnType: string, threadsafe?: boolean): number;
 ```
 
-將 ArkTS 函數存入回調註冊表。返回槽位句柄。
+Stores a TS function in the callback registry. Returns a slot handle.
 
 ### `destroyCallback()`
 
@@ -119,7 +119,7 @@ function createCallback(callback: Function, argTypes: string, returnType: string
 function destroyCallback(handle: number): void;
 ```
 
-從註冊表移除回調。
+Removes a callback from the registry.
 
 ### `invokeCallback()`
 
@@ -127,7 +127,7 @@ function destroyCallback(handle: number): void;
 function invokeCallback(handle: number, ...args: any[]): any;
 ```
 
-通過句柄調用已存儲的回調。
+Invokes a stored callback by its handle.
 
 ### `getCallbackThreadsafe()`
 
@@ -135,7 +135,7 @@ function invokeCallback(handle: number, ...args: any[]): any;
 function getCallbackThreadsafe(handle: number): boolean;
 ```
 
-返回回調是否爲線程安全模式。
+Returns whether the callback is thread-safe.
 
 ### `getCallbackPtr()`
 
@@ -143,9 +143,9 @@ function getCallbackThreadsafe(handle: number): boolean;
 function getCallbackPtr(handle: number): number;
 ```
 
-返回回調的函數指針。
-- 非線程安全：返回槽位句柄（小整數）
-- 線程安全：返回真實的可執行蹦牀函數地址
+Returns the callback function pointer.
+- Non-threadsafe: returns the slot handle
+- Threadsafe: returns a real executable trampoline address
 
 ### `callCallbackThreadSafe()`
 
@@ -153,7 +153,7 @@ function getCallbackPtr(handle: number): number;
 function callCallbackThreadSafe(handle: number, arg: number): void;
 ```
 
-通過 TSFN（線程安全函數）路徑調用回調，用於驗證線程安全機制。
+Calls a callback through the TSFN path for verification purposes.
 
 ### `ptr()`
 
@@ -161,9 +161,9 @@ function callCallbackThreadSafe(handle: number, arg: number): void;
 function ptr(buffer: ArrayBuffer | TypedArray): number;
 ```
 
-獲取 ArrayBuffer 或 TypedArray 的底層內存指針。
+Gets the underlying memory pointer of an ArrayBuffer or TypedArray.
 
 ```typescript
 const buf = new ArrayBuffer(256);
-const p = ffi.ptr(buf); // → 內存地址
+const p = ffi.ptr(buf); // → memory address
 ```

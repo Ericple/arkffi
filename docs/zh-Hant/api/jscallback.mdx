@@ -48,7 +48,17 @@ constructor(
 get ptr(): number;
 ```
 
-返回回調槽位句柄。
+返回可用於原生 C 代碼的函數指針地址。
+- **非線程安全**：返回槽位句柄（小整數）。
+- **線程安全**：返回真實的可執行蹦牀函數地址，可傳給 C 函數作爲回調參數。
+
+### `getHandle()`
+
+```typescript
+getHandle(): number;
+```
+
+返回內部槽位句柄，可用於 `ffi.invokeCallback()` 和 `ffi.callCallbackThreadSafe()`。
 
 ### `threadsafe`
 

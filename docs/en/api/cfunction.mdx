@@ -1,0 +1,73 @@
+---
+title: "CFunction"
+description: "Wrap a raw C function pointer as a callable TypeScript function"
+---
+
+`CFunction` wraps a raw C function pointer as a callable TypeScript function.
+
+## Example
+
+```typescript
+import ffi from 'liblibrary.so';
+import { CFunction, FFIType } from 'arkffi';
+
+const handle = ffi.load('libffi_target.so');
+const ptr = ffi.getSymbolPtr(handle, 'add');
+
+const add = CFunction({
+  args: [FFIType.double, FFIType.double],
+  returns: FFIType.double,
+  ptr: ptr,
+});
+
+add(2.0, 3.0); // → 5.0
+add.close();
+ffi.close(handle);
+```
+
+## Syntax
+
+```typescript
+function CFunction(def: {
+  args: string[];
+  returns: string;
+  ptr: number;
+}): {
+  (...args: any[]): number;
+  close(): void;
+};
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `def.args` | `string[]` | C function argument type codes. Supports `FFIType.callback` (auto-extracts `.ptr` from JSCallback) |
+| `def.returns` | `string` | C function return type code |
+| `def.ptr` | `number` | Raw function pointer address |
+
+## Callback Type Arguments
+
+When an argument type is `FFIType.callback` (`'k'`), the JSCallback instance is automatically unwrapped to its `.ptr`:
+
+```typescript
+let fn = CFunction({
+  args: [FFIType.callback, FFIType.int32],
+  returns: FFIType.int32,
+  ptr: applyPtr,
+});
+fn(cb, 21); // cb.ptr is automatically used as the first argument
+```
+
+## Obtaining Pointers
+
+Use `ffi.getSymbolPtr(handle, name)`:
+
+```typescript
+const handle = ffi.load('lib.so');
+const ptr = ffi.getSymbolPtr(handle, 'calculate');
+const fn = CFunction({ args: ['i', 'd'], returns: 'd', ptr });
+fn(42, 3.14);
+fn.close();
+ffi.close(handle);
+```

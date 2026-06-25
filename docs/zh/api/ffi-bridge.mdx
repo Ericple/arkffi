@@ -136,3 +136,34 @@ function getCallbackThreadsafe(handle: number): boolean;
 ```
 
 返回回调是否为线程安全模式。
+
+### `getCallbackPtr()`
+
+```typescript
+function getCallbackPtr(handle: number): number;
+```
+
+返回回调的函数指针。
+- 非线程安全：返回槽位句柄（小整数）
+- 线程安全：返回真实的可执行蹦床函数地址
+
+### `callCallbackThreadSafe()`
+
+```typescript
+function callCallbackThreadSafe(handle: number, arg: number): void;
+```
+
+通过 TSFN（线程安全函数）路径调用回调，用于验证线程安全机制。
+
+### `ptr()`
+
+```typescript
+function ptr(buffer: ArrayBuffer | TypedArray): number;
+```
+
+获取 ArrayBuffer 或 TypedArray 的底层内存指针。
+
+```typescript
+const buf = new ArrayBuffer(256);
+const p = ffi.ptr(buf); // → 内存地址
+```

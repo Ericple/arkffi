@@ -1,0 +1,48 @@
+---
+title: "Library"
+description: "The loaded library instance returned by dlopen"
+---
+
+The `Library` class represents a loaded shared library.
+
+## Example
+
+```typescript
+import { dlopen, FFIType } from 'arkffi';
+
+const lib = dlopen('libffi_target.so', {
+  add: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+});
+lib.symbols.add(2.0, 3.0);
+lib.close();
+```
+
+## Properties
+
+### `symbols`
+
+```
+readonly symbols: ConvertFns<Fns>;
+```
+
+An object whose keys match function names from the `defs` argument. Each value is a callable function.
+
+```typescript
+lib.symbols.add(2.0, 3.0);
+lib.symbols.compute(0, 4.0, 'square');
+```
+
+## Methods
+
+### `close()`
+
+```typescript
+close(): void;
+```
+
+Calls `dlclose()` on the native library handle.
+
+```typescript
+lib.close();
+lib.close();  // safe to call multiple times
+```

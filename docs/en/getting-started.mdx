@@ -1,0 +1,78 @@
+---
+title: "Getting Started"
+description: "Install arkffi and call your first C function"
+---
+
+<Steps>
+  <Step title="Prerequisites">
+    Before you begin, make sure you have:
+
+    - HarmonyOS NEXT (API 21+) device or emulator
+    - DevEco Studio with HarmonyOS SDK
+    - A `.so` shared library (pre-built or compiled from source)
+  </Step>
+
+  <Step title="Install arkffi">
+
+    ```bash
+    ohpm install arkffi
+    ```
+  </Step>
+
+  <Step title="Import and use">
+
+    ```typescript
+    import { dlopen, FFIType, CString, CFunction, JSCallback } from 'arkffi';
+
+    const lib = dlopen('libmylib.so', {
+      calculate: {
+        args: [FFIType.int32, FFIType.double, FFIType.CString],
+        returns: FFIType.double,
+      },
+    });
+
+    lib.symbols.calculate(42, 3.14, 'hello');
+    lib.close();
+    ```
+  </Step>
+
+  <Step title="Use the raw bridge">
+    For lower-level control, use the NAPI functions directly:
+
+    ```typescript
+    import ffi from 'liblibrary.so';
+
+    const handle = ffi.load('libffi_target.so');
+    ffi.defineFunction(handle, 'add', 'dd', 'd');
+    const sum = ffi.callBySig(handle, 'add', [2.0, 3.0], []);
+    ffi.close(handle);
+    ```
+  </Step>
+
+  <Step title="Work with C pointers">
+
+    ```typescript
+    const ptr = ffi.getSymbolPtr(handle, 'add');
+
+    ffi.callPtr(ptr, 'dd', 'd', [2.0, 3.0], []);
+
+    const cstr = new CString(ptr);
+    cstr.toString();
+    cstr.length;
+    ```
+  </Step>
+
+  <Step title="Create callbacks">
+
+    ```typescript
+    const cb = new JSCallback(
+      (a: number, b: number): number => a + b,
+      { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+    );
+
+    cb.call(2, 3);   // → 5
+    cb.ptr;          // → slot handle or trampoline address
+    cb.close();
+    ```
+  </Step>
+</Steps>
