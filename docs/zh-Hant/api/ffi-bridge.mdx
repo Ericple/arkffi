@@ -1,0 +1,138 @@
+---
+title: "原始 NAPI 橋接"
+description: "底層 NAPI 函數的直接訪問"
+---
+
+原始橋接提供對 `liblibrary.so` 導出的 NAPI 函數的直接訪問。
+
+## 導入
+
+```typescript
+import ffi from 'liblibrary.so';
+```
+
+## API 參考
+
+### `load()`
+
+```typescript
+function load(libName: string): bigint;
+```
+
+調用 `dlopen()` 打開庫。返回 `bigint` 句柄。
+
+```typescript
+const handle = ffi.load('libffi_target.so');
+```
+
+### `close()`
+
+```typescript
+function close(handle: bigint): void;
+```
+
+調用 `dlclose()` 釋放庫句柄。
+
+### `defineFunction()`
+
+```typescript
+function defineFunction(handle: bigint, funcName: string, argTypes: string, returnType: string): void;
+```
+
+通過 `dlsym()` 解析函數並註冊類型簽名。
+
+```typescript
+ffi.defineFunction(handle, 'add', 'dd', 'd');
+```
+
+### `callBySig()`
+
+```typescript
+function callBySig(handle: bigint, funcName: string, numArgs: number[], strArgs: string[]): number;
+```
+
+調用之前註冊的函數。
+
+```typescript
+ffi.callBySig(handle, 'add', [2.0, 3.0], []);
+```
+
+### `callMixed()`
+
+```typescript
+function callMixed(handle: bigint, funcName: string, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): number;
+```
+
+一站式調用——`dlsym()` 和類型分發合併爲一次調用。
+
+```typescript
+ffi.callMixed(handle, 'compute', 'ids', 'd', [0, 4.0], ['square']);
+```
+
+### `callString()`
+
+```typescript
+function callString(handle: bigint, funcName: string): string;
+```
+
+調用返回 `const char*` 的 C 函數。
+
+```typescript
+ffi.callString(handle, 'getVersion'); // → "1.0.0"
+```
+
+### `readCString()`
+
+```typescript
+function readCString(ptr: number): string;
+```
+
+從原始指針讀取 null 結尾的 C 字符串。
+
+### `callPtr()`
+
+```typescript
+function callPtr(ptr: number, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): number;
+```
+
+通過原始函數指針調用，跳過 `dlsym()`。
+
+### `getSymbolPtr()`
+
+```typescript
+function getSymbolPtr(handle: bigint, funcName: string): number;
+```
+
+返回符號的原始函數指針。
+
+### `createCallback()`
+
+```typescript
+function createCallback(callback: Function, argTypes: string, returnType: string, threadsafe?: boolean): number;
+```
+
+將 JS 函數存入回調註冊表。返回槽位句柄。
+
+### `destroyCallback()`
+
+```typescript
+function destroyCallback(handle: number): void;
+```
+
+從註冊表移除回調。
+
+### `invokeCallback()`
+
+```typescript
+function invokeCallback(handle: number, ...args: any[]): any;
+```
+
+通過句柄調用已存儲的回調。
+
+### `getCallbackThreadsafe()`
+
+```typescript
+function getCallbackThreadsafe(handle: number): boolean;
+```
+
+返回回調是否爲線程安全模式。

@@ -1,0 +1,84 @@
+---
+title: "回调"
+description: "通过 JSCallback 将 JavaScript 函数传递给 C 代码"
+---
+
+`JSCallback` 包装 JavaScript 函数，使其可作为 C 函数指针使用。
+
+## 基本用法
+
+```typescript
+const cb = new JSCallback(
+  (a: number, b: number): number => a + b,
+  { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+);
+
+cb.call(2, 3); // → 5
+```
+
+## 闭包捕获
+
+```typescript
+function makeAdder(x: number): JSCallback {
+  return new JSCallback(
+    (y: number): number => x + y,
+    { args: [FFIType.int32], returns: FFIType.int32 },
+  );
+}
+
+const add5 = makeAdder(5);
+add5.call(3); // → 8
+add5.close();
+```
+
+## 线程安全
+
+可能从不同线程调用时设置 `threadsafe: true`：
+
+```typescript
+const cb = new JSCallback(
+  (x: number): number => x * 2,
+  { args: [FFIType.int32], returns: FFIType.double, threadsafe: true },
+);
+
+cb.threadsafe; // → true
+cb.call(5);    // → 10
+cb.close();
+```
+
+## 清理
+
+始终调用 `close()` 释放资源：
+
+```typescript
+cb.close();
+cb.call(1); // 抛出异常：句柄无效
+```
+
+## 多个回调
+
+```typescript
+import { JSCallback, FFIType } from 'library';
+
+const add = new JSCallback(fn1, { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 });
+const mul = new JSCallback(fn2, { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 });
+
+add.call(3, 4); // 7
+mul.call(3, 4); // 12
+
+add.close();
+mul.close();
+```
+
+## 传递给原生函数
+
+```typescript
+// C: void foreach(int* arr, int len, void (*cb)(int));
+const cb = new JSCallback(
+  (x: number): number => x * 2,
+  { args: [FFIType.int32], returns: FFIType.int32 },
+);
+
+ffi.callMixed(handle, 'foreach', 'ipi', 'v', [arrPtr, len, cb.ptr], []);
+cb.close();
+```

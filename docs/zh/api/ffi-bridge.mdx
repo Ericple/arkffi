@@ -1,0 +1,138 @@
+---
+title: "原始 NAPI 桥接"
+description: "底层 NAPI 函数的直接访问"
+---
+
+原始桥接提供对 `liblibrary.so` 导出的 NAPI 函数的直接访问。
+
+## 导入
+
+```typescript
+import ffi from 'liblibrary.so';
+```
+
+## API 参考
+
+### `load()`
+
+```typescript
+function load(libName: string): bigint;
+```
+
+调用 `dlopen()` 打开库。返回 `bigint` 句柄。
+
+```typescript
+const handle = ffi.load('libffi_target.so');
+```
+
+### `close()`
+
+```typescript
+function close(handle: bigint): void;
+```
+
+调用 `dlclose()` 释放库句柄。
+
+### `defineFunction()`
+
+```typescript
+function defineFunction(handle: bigint, funcName: string, argTypes: string, returnType: string): void;
+```
+
+通过 `dlsym()` 解析函数并注册类型签名。
+
+```typescript
+ffi.defineFunction(handle, 'add', 'dd', 'd');
+```
+
+### `callBySig()`
+
+```typescript
+function callBySig(handle: bigint, funcName: string, numArgs: number[], strArgs: string[]): number;
+```
+
+调用之前注册的函数。
+
+```typescript
+ffi.callBySig(handle, 'add', [2.0, 3.0], []);
+```
+
+### `callMixed()`
+
+```typescript
+function callMixed(handle: bigint, funcName: string, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): number;
+```
+
+一站式调用——`dlsym()` 和类型分发合并为一次调用。
+
+```typescript
+ffi.callMixed(handle, 'compute', 'ids', 'd', [0, 4.0], ['square']);
+```
+
+### `callString()`
+
+```typescript
+function callString(handle: bigint, funcName: string): string;
+```
+
+调用返回 `const char*` 的 C 函数。
+
+```typescript
+ffi.callString(handle, 'getVersion'); // → "1.0.0"
+```
+
+### `readCString()`
+
+```typescript
+function readCString(ptr: number): string;
+```
+
+从原始指针读取 null 结尾的 C 字符串。
+
+### `callPtr()`
+
+```typescript
+function callPtr(ptr: number, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): number;
+```
+
+通过原始函数指针调用，跳过 `dlsym()`。
+
+### `getSymbolPtr()`
+
+```typescript
+function getSymbolPtr(handle: bigint, funcName: string): number;
+```
+
+返回符号的原始函数指针。
+
+### `createCallback()`
+
+```typescript
+function createCallback(callback: Function, argTypes: string, returnType: string, threadsafe?: boolean): number;
+```
+
+将 JS 函数存入回调注册表。返回槽位句柄。
+
+### `destroyCallback()`
+
+```typescript
+function destroyCallback(handle: number): void;
+```
+
+从注册表移除回调。
+
+### `invokeCallback()`
+
+```typescript
+function invokeCallback(handle: number, ...args: any[]): any;
+```
+
+通过句柄调用已存储的回调。
+
+### `getCallbackThreadsafe()`
+
+```typescript
+function getCallbackThreadsafe(handle: number): boolean;
+```
+
+返回回调是否为线程安全模式。

@@ -1,0 +1,67 @@
+---
+title: "混合参数类型"
+description: "使用混合 int、double 和 string 参数调用 C 函数"
+---
+
+C 函数经常接受不同类型的参数。arkffi 通过将数值和字符串参数分开为两个数组来处理。
+
+## 签名编码
+
+| 编码 | C 类型 |
+|---|---|
+| `i` | `int32_t`, `int`, `bool`, `char` |
+| `l` | `int64_t`, `uint64_t`, `void*` |
+| `d` | `double`, `float` |
+| `s` | `const char*` |
+
+对于如下函数：
+
+```c
+double compute(int mode, double value, const char* name);
+```
+
+类型字符串为 `"ids"`，返回类型为 `"d"`。
+
+## 使用 `callMixed`
+
+```typescript
+const h = ffi.load('libffi_target.so');
+
+const result = ffi.callMixed(
+  h, 'compute',
+  'ids',       // 参数类型：int32, double, CString
+  'd',         // 返回类型：double
+  [0, 4.0],    // 数值参数
+  ['square'],  // 字符串参数
+);
+
+ffi.close(h);
+```
+
+## 使用 `dlopen`
+
+```typescript
+const lib = dlopen('libffi_target.so', {
+  compute: {
+    args: [FFIType.int32, FFIType.double, FFIType.CString],
+    returns: FFIType.double,
+  },
+});
+
+lib.symbols.compute(0, 4.0, 'square');
+```
+
+## 支持的签名
+
+| 签名 | C 函数 |
+|---|---|
+| `id` | `double fn(int32_t, double)` |
+| `di` | `double fn(double, int32_t)` |
+| `ids` | `double fn(int32_t, double, const char*)` |
+| `sid` | `double fn(const char*, int32_t, double)` |
+| `isd` | `double fn(int32_t, const char*, double)` |
+| `iid` | `double fn(int32_t, int32_t, double)` |
+| `idi` | `double fn(int32_t, double, int32_t)` |
+| `idid` | `double fn(int32_t, double, int32_t, double)` |
+| `ss` | `int32_t fn(const char*, const char*)` |
+| `s` | `double fn(const char*)` |

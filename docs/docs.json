@@ -1,0 +1,98 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "arkffi",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "languages": [
+      {
+        "language": "zh",
+        "default": true,
+        "groups": [
+          {
+            "group": "快速开始",
+            "pages": [
+              "zh/index",
+              "zh/getting-started"
+            ]
+          },
+          {
+            "group": "API 参考",
+            "pages": [
+              "zh/api/dlopen",
+              "zh/api/library",
+              "zh/api/ffi-type",
+              "zh/api/cstring",
+              "zh/api/cfunction",
+              "zh/api/jscallback",
+              "zh/api/ffi-bridge"
+            ]
+          },
+          {
+            "group": "指南",
+            "pages": [
+              "zh/guides/mixed-types",
+              "zh/guides/function-pointers",
+              "zh/guides/callbacks",
+              "zh/guides/external-library"
+            ]
+          },
+          {
+            "group": "示例",
+            "pages": [
+              "zh/examples/complete"
+            ]
+          }
+        ]
+      },
+      {
+        "language": "zh-Hant",
+        "groups": [
+          {
+            "group": "快速開始",
+            "pages": [
+              "zh-Hant/index",
+              "zh-Hant/getting-started"
+            ]
+          },
+          {
+            "group": "API 參考",
+            "pages": [
+              "zh-Hant/api/dlopen",
+              "zh-Hant/api/library",
+              "zh-Hant/api/ffi-type",
+              "zh-Hant/api/cstring",
+              "zh-Hant/api/cfunction",
+              "zh-Hant/api/jscallback",
+              "zh-Hant/api/ffi-bridge"
+            ]
+          },
+          {
+            "group": "指南",
+            "pages": [
+              "zh-Hant/guides/mixed-types",
+              "zh-Hant/guides/function-pointers",
+              "zh-Hant/guides/callbacks",
+              "zh-Hant/guides/external-library"
+            ]
+          },
+          {
+            "group": "範例",
+            "pages": [
+              "zh-Hant/examples/complete"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  }
+}

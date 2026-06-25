@@ -1,0 +1,104 @@
+---
+title: "快速开始"
+description: "安装 arkffi 并调用你的第一个 C 函数"
+---
+
+<Steps>
+  <Step title="前置条件">
+    开始之前，请确保你已准备好：
+
+    - HarmonyOS NEXT（API 21+）设备或模拟器
+    - DevEco Studio 和 HarmonyOS SDK
+    - 一个 `.so` 共享库（预编译或从源码编译）
+  </Step>
+
+  <Step title="添加 library 模块">
+    在项目中添加 HAR 模块：
+
+    ```
+    Project/
+    └── library/
+        ├── src/main/cpp/          # 原生 C++ 代码
+        ├── src/main/ets/          # ArkTS/TS 封装
+        ├── build-profile.json5
+        └── oh-package.json5
+    ```
+  </Step>
+
+  <Step title="配置原生构建">
+
+    ```json filename="library/build-profile.json5"
+    {
+      "buildOption": {
+        "externalNativeOptions": {
+          "path": "./src/main/cpp/CMakeLists.txt",
+          "abiFilters": ["arm64-v8a", "x86_64"]
+        }
+      }
+    }
+    ```
+
+    ```cmake filename="library/src/main/cpp/CMakeLists.txt"
+    cmake_minimum_required(VERSION 3.5.0)
+    add_library(library SHARED napi_init.cpp)
+    target_link_libraries(library PUBLIC libace_napi.z.so)
+    ```
+  </Step>
+
+  <Step title="导入并使用">
+
+    ```typescript
+    import { dlopen, FFIType, CString, CFunction, JSCallback } from 'library';
+
+    const lib = dlopen('libmylib.so', {
+      calculate: {
+        args: [FFIType.int32, FFIType.double, FFIType.CString],
+        returns: FFIType.double,
+      },
+    });
+
+    lib.symbols.calculate(42, 3.14, 'hello');
+    lib.close();
+    ```
+  </Step>
+
+  <Step title="使用原始桥接">
+    需要更底层的控制时，可直接使用 NAPI 函数：
+
+    ```typescript
+    import ffi from 'liblibrary.so';
+
+    const handle = ffi.load('libffi_target.so');
+    ffi.defineFunction(handle, 'add', 'dd', 'd');
+    const sum = ffi.callBySig(handle, 'add', [2.0, 3.0], []);
+    ffi.close(handle);
+    ```
+  </Step>
+
+  <Step title="操作 C 指针">
+
+    ```typescript
+    const ptr = ffi.getSymbolPtr(handle, 'add');
+
+    ffi.callPtr(ptr, 'dd', 'd', [2.0, 3.0], []);
+
+    const cstr = new CString(ptr);
+    cstr.toString();
+    cstr.length;
+    ```
+  </Step>
+
+  <Step title="创建回调">
+
+    ```typescript
+    const cb = new JSCallback(
+      (a: number, b: number): number => a + b,
+      { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+    );
+
+    cb.call(2, 3);   // → 5
+    cb.ptr;          // → 槽位句柄
+    cb.close();
+    ```
+  </Step>
+</Steps>

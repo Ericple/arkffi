@@ -1,0 +1,73 @@
+---
+title: "arkffi 概述"
+description: "ArkTS / HarmonyOS 的外部函数接口库"
+---
+
+arkffi 让你从 ArkTS 直接调用 `.so` 共享库中的 C 函数 —— 无需手写 NAPI 绑定。
+
+<CardGroup cols={3}>
+  <Card title="快速开始" icon="rocket" href="/zh/getting-started">
+    安装、配置，在几分钟内调用你的第一个 C 函数。
+  </Card>
+  <Card title="API 参考" icon="book-open" href="/zh/api/dlopen">
+    dlopen、FFIType、CString、CFunction、JSCallback 完整参考。
+  </Card>
+  <Card title="指南" icon="compass" href="/zh/guides/mixed-types">
+    混合类型、函数指针、回调的深入指南。
+  </Card>
+</CardGroup>
+
+## 概述
+
+arkffi 提供三个抽象层：
+
+| 层级 | 说明 |
+|---|---|
+| **原始 NAPI 桥接** | `load`、`close`、`callMixed`、`callBySig`、`callString`、`readCString`、`getSymbolPtr`、`callPtr` |
+| **`dlopen` 封装** | 声明式 `dlopen()`，支持字典式函数定义和类型化符号 |
+| **CFunction / JSCallback** | 函数指针包装和 JavaScript 回调支持 |
+
+### 特性
+
+- 从 `.so` 库调用任意导出的 C 函数
+- 支持 `int32`、`int64`、`double`、`float`、`bool`、`pointer`、`cstring`
+- 混合参数类型（`int` + `double` + `string` 一次调用）
+- 通过 `CFunction` 支持函数指针
+- 通过 `JSCallback` 支持 JavaScript 回调，可设置 `threadsafe`
+- 通过 `CString` 读取 C 字符串
+- TypeScript 泛型支持 IDE 代码补全
+
+## 快速开始
+
+```typescript
+import { dlopen, FFIType, CString } from 'library';
+
+const lib = dlopen('libffi_target.so', {
+  add:        { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+  getVersion: { args: [],                                returns: FFIType.int64 },
+});
+
+lib.symbols.add(2.0, 3.0);
+new CString(lib.symbols.getVersion()).toString();
+
+lib.close();
+```
+
+## 架构
+
+```
+ArkTS / TypeScript        dlopen / CFunction / JSCallback / CString
+      │                              │
+      ▼                              ▼ (NAPI)
+liblibrary.so ──dlopen/dlsym/dlclose──► libffi_target.so (或任意 .so)
+```
+
+## 安装
+
+```json
+{
+  "dependencies": {
+    "library": "file:./library"
+  }
+}
+```

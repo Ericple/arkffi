@@ -1,0 +1,67 @@
+---
+title: "混合參數類型"
+description: "使用混合 int、double 和 string 參數調用 C 函數"
+---
+
+C 函數經常接受不同類型的參數。arkffi 通過將數值和字符串參數分開爲兩個數組來處理。
+
+## 簽名編碼
+
+| 編碼 | C 類型 |
+|---|---|
+| `i` | `int32_t`, `int`, `bool`, `char` |
+| `l` | `int64_t`, `uint64_t`, `void*` |
+| `d` | `double`, `float` |
+| `s` | `const char*` |
+
+對於如下函數：
+
+```c
+double compute(int mode, double value, const char* name);
+```
+
+類型字符串爲 `"ids"`，返回類型爲 `"d"`。
+
+## 使用 `callMixed`
+
+```typescript
+const h = ffi.load('libffi_target.so');
+
+const result = ffi.callMixed(
+  h, 'compute',
+  'ids',       // 參數類型：int32, double, CString
+  'd',         // 返回類型：double
+  [0, 4.0],    // 數值參數
+  ['square'],  // 字符串參數
+);
+
+ffi.close(h);
+```
+
+## 使用 `dlopen`
+
+```typescript
+const lib = dlopen('libffi_target.so', {
+  compute: {
+    args: [FFIType.int32, FFIType.double, FFIType.CString],
+    returns: FFIType.double,
+  },
+});
+
+lib.symbols.compute(0, 4.0, 'square');
+```
+
+## 支持的簽名
+
+| 簽名 | C 函數 |
+|---|---|
+| `id` | `double fn(int32_t, double)` |
+| `di` | `double fn(double, int32_t)` |
+| `ids` | `double fn(int32_t, double, const char*)` |
+| `sid` | `double fn(const char*, int32_t, double)` |
+| `isd` | `double fn(int32_t, const char*, double)` |
+| `iid` | `double fn(int32_t, int32_t, double)` |
+| `idi` | `double fn(int32_t, double, int32_t)` |
+| `idid` | `double fn(int32_t, double, int32_t, double)` |
+| `ss` | `int32_t fn(const char*, const char*)` |
+| `s` | `double fn(const char*)` |

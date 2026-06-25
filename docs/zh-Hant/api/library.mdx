@@ -1,0 +1,48 @@
+---
+title: "Library"
+description: "dlopen 返回的加載庫實例"
+---
+
+`Library` 類表示已加載的共享庫。
+
+## 示例
+
+```typescript
+import { dlopen, FFIType } from 'library';
+
+const lib = dlopen('libffi_target.so', {
+  add: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+});
+lib.symbols.add(2.0, 3.0);
+lib.close();
+```
+
+## 屬性
+
+### `symbols`
+
+```
+readonly symbols: ConvertFns<Fns>;
+```
+
+鍵與 `defs` 參數中的函數名匹配的對象。每個值都是可調用的函數。
+
+```typescript
+lib.symbols.add(2.0, 3.0);
+lib.symbols.compute(0, 4.0, 'square');
+```
+
+## 方法
+
+### `close()`
+
+```typescript
+close(): void;
+```
+
+調用 `dlclose()` 釋放原生庫句柄。
+
+```typescript
+lib.close();
+lib.close();  // 多次調用安全
+```

@@ -1,0 +1,111 @@
+---
+title: "JSCallback"
+description: "将 JavaScript 函数包装为 C 回调"
+---
+
+`JSCallback` 包装 JavaScript 函数，使其可用于期望函数指针的 C 代码。
+
+## 示例
+
+```typescript
+import { JSCallback, FFIType } from 'library';
+
+const cb = new JSCallback(
+  (a: number, b: number): number => a + b,
+  { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+);
+
+cb.call(2, 3); // → 5
+cb.ptr;        // → 槽位句柄
+cb.close();
+```
+
+## 构造函数
+
+```typescript
+constructor(
+  callback: (...args: any[]) => any,
+  def: {
+    args: string[];
+    returns: string;
+    threadsafe?: boolean;
+  },
+);
+```
+
+| 参数 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `callback` | `Function` | — | 要包装的 JavaScript 函数 |
+| `def.args` | `string[]` | — | C 函数参数类型编码 |
+| `def.returns` | `string` | — | C 函数返回类型编码 |
+| `def.threadsafe` | `boolean` | `false` | 是否可从任意线程调用 |
+
+## 属性
+
+### `ptr`
+
+```typescript
+get ptr(): number;
+```
+
+返回回调槽位句柄。
+
+### `threadsafe`
+
+```typescript
+readonly threadsafe: boolean;
+```
+
+回调是否以线程安全模式创建。
+
+## 方法
+
+### `call()`
+
+```typescript
+call(...args: any[]): any;
+```
+
+调用 JavaScript 回调。
+
+```typescript
+cb.call(7);  // → 70
+```
+
+### `close()`
+
+```typescript
+close(): void;
+```
+
+释放回调资源。
+
+```typescript
+cb.close();
+cb.call(1); // 抛出异常
+```
+
+## 线程安全回调
+
+```typescript
+const cb = new JSCallback(fn, {
+  args: [FFIType.int32],
+  returns: FFIType.double,
+  threadsafe: true,
+});
+cb.threadsafe; // → true
+```
+
+## 闭包捕获
+
+```typescript
+let factor = 10;
+const cb = new JSCallback(
+  (x: number): number => x * factor,
+  { args: [FFIType.int32], returns: FFIType.int32 },
+);
+cb.call(5); // → 50
+factor = 20;
+cb.call(5); // → 100
+cb.close();
+```

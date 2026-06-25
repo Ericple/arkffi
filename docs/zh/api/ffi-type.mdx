@@ -1,0 +1,46 @@
+---
+title: "FFIType"
+description: "C 函数定义中的类型常量"
+---
+
+`FFIType` 提供函数定义中使用的类型常量。
+
+## 常量表
+
+| 常量 | 编码 | JS 类型 | C 类型 |
+|---|---|---|---|
+| `FFIType.char` / `int8_t` / `i8` | `c` | `number` | `char` / `int8_t` |
+| `FFIType.uint8_t` / `u8` | `i` | `number` | `uint8_t` |
+| `FFIType.int16_t` / `i16` | `i` | `number` | `int16_t` |
+| `FFIType.uint16_t` / `u16` | `i` | `number` | `uint16_t` |
+| `FFIType.int32` / `i32` / `int` / `uint32_t` / `u32` | `i` | `number` | `int32_t` |
+| `FFIType.int64` / `i64` / `int64_t` / `uint64_t` / `u64` | `l` | `number` | `int64_t` / `uint64_t` |
+| `FFIType.double` / `f64` | `d` | `number` | `double` |
+| `FFIType.float` / `f32` | `f` | `number` | `float` |
+| `FFIType.bool` | `b` | `number` | `bool` |
+| `FFIType.CString` | `s` | `string` | `const char*` |
+| `FFIType.ptr` / `pointer` / `function` / `buffer` | `p` | `number` | `void*` |
+
+## 用法
+
+```typescript
+import { FFIType } from 'library';
+
+const def = {
+  args: [FFIType.int32, FFIType.double, FFIType.CString],
+  returns: FFIType.double,
+};
+
+// 也可使用字符串字面量（等价的简写形式）
+// args: ['i', 'd', 's']
+// returns: 'd'
+```
+
+## ARM64 寄存器映射
+
+| C 类型 | JS 类型 | 寄存器 |
+|---|---|---|
+| `int32_t`, `bool`, `char` | `number` | x0-x7 |
+| `int64_t`, `uint64_t`, `void*` | `number` | x0-x7 |
+| `float`, `double` | `number` | v0-v7 |
+| `const char*` | `string` | x0-x7（指针） |

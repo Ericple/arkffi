@@ -1,0 +1,64 @@
+---
+title: "dlopen"
+description: "加載共享庫並獲取類型化函數定義"
+---
+
+`dlopen` 加載共享庫並返回帶類型化符號的 [`Library`](/zh/api/library) 實例。
+
+## 語法
+
+```typescript
+function dlopen<Fns extends Record<string, FFIFunction>>(
+  libName: string,
+  defs: Fns,
+): Library<Fns>;
+```
+
+## 示例
+
+```typescript
+import { dlopen, FFIType } from 'library';
+
+const lib = dlopen('libffi_target.so', {
+  add:     { args: [FFIType.double, FFIType.double],     returns: FFIType.double },
+  compute: { args: [FFIType.int32, FFIType.double, FFIType.CString], returns: FFIType.double },
+});
+
+lib.symbols.add(2.0, 3.0);
+lib.symbols.compute(0, 4.0, 'square');
+lib.close();
+```
+
+## 參數
+
+| 參數 | 類型 | 說明 |
+|---|---|---|
+| `libName` | `string` | `.so` 庫的路徑或名稱 |
+| `defs` | `Record<string, FFIFunction>` | 函數名到類型定義的映射 |
+
+## FFIFunction
+
+```typescript
+interface FFIFunction {
+  args: string[];        // 參數類型編碼
+  returns: string;       // 返回類型編碼
+  threadsafe?: boolean;  // 用於 JSCallback 定義
+}
+```
+
+## 類型推斷
+
+`dlopen` 使用 TypeScript 泛型推斷 `symbols` 的結構，爲所有定義的函數名提供 IDE 自動補全。
+
+```typescript
+import { dlopen, FFIType } from 'library';
+
+const lib = dlopen('lib.so', {
+  myFunc: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+});
+lib.symbols.myFunc(2.0, 3.0); // 自動補全
+```
+
+## 返回值
+
+返回 [`Library`](/zh/api/library) 實例。

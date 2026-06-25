@@ -1,0 +1,63 @@
+---
+title: "函數指針"
+description: "通過 CFunction 使用原始 C 函數指針"
+---
+
+部分 C API 期望函數指針作爲參數。arkffi 提供 `CFunction` 來包裝它們。
+
+## 獲取指針
+
+```typescript
+const handle = ffi.load('libffi_target.so');
+const ptr = ffi.getSymbolPtr(handle, 'add');
+// ptr 是 C 函數的內存地址
+```
+
+## 創建 CFunction 包裝
+
+```typescript
+import { CFunction, FFIType } from 'library';
+
+const add = CFunction({
+  args: [FFIType.double, FFIType.double],
+  returns: FFIType.double,
+  ptr: ptr,
+});
+
+add(2.0, 3.0); // → 5.0
+add.close();
+```
+
+## 生命週期
+
+完成後始終關閉包裝器：
+
+```typescript
+const fn = CFunction({ ... });
+fn();
+fn.close();
+```
+
+## 傳遞給 C API
+
+```typescript
+import { CFunction, FFIType } from 'library';
+
+// C: void sort(int* arr, int (*cmp)(int, int));
+const cmp = CFunction({ args: [FFIType.int32, FFIType.int32], returns: FFIType.int32, ptr: cmpPtr });
+ffi.callMixed(handle, 'sort', 'ip', 'v', [arrPtr, cmp.ptr], []);
+```
+
+## 使用 JSCallback 代替
+
+對於 JavaScript 到 C 的回調，使用 `JSCallback`：
+
+```typescript
+const cmp = new JSCallback(
+  (a: number, b: number): number => a - b,
+  { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+);
+
+ffi.callMixed(handle, 'sort', 'ip', 'v', [arrPtr, cmp.ptr], []);
+cmp.close();
+```

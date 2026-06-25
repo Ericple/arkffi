@@ -1,0 +1,62 @@
+---
+title: "CString"
+description: "从原始指针读取 C 字符串"
+---
+
+`CString` 包装一个原始 C 字符串指针（`const char*`）并提供安全读取。
+
+## 示例
+
+```typescript
+import { dlopen, FFIType, CString } from 'library';
+
+const lib = dlopen('libffi_target.so', {
+  getVersion: { args: [], returns: FFIType.int64 },
+});
+
+const ptr: number = lib.symbols.getVersion();
+const cstr = new CString(ptr);
+
+cstr.toString(); // → "1.0.0"
+cstr.length;     // → 5
+
+lib.close();
+```
+
+## 构造函数
+
+```typescript
+constructor(ptr: number);
+```
+
+从原始内存地址创建 `CString`。指针必须指向有效的 null 结尾 C 字符串。
+
+## 属性
+
+### `length`
+
+```typescript
+get length(): number;
+```
+
+返回 C 字符串的长度（字符数）。
+
+## 方法
+
+### `toString()`
+
+```typescript
+toString(): string;
+```
+
+读取 C 字符串并以 JavaScript 字符串返回。
+
+## 空指针
+
+传入 `0`（空指针）是安全的，返回空字符串：
+
+```typescript
+const cstr = new CString(0);
+cstr.toString(); // → ""
+cstr.length;     // → 0
+```

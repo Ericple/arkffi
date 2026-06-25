@@ -1,0 +1,63 @@
+---
+title: "函数指针"
+description: "通过 CFunction 使用原始 C 函数指针"
+---
+
+部分 C API 期望函数指针作为参数。arkffi 提供 `CFunction` 来包装它们。
+
+## 获取指针
+
+```typescript
+const handle = ffi.load('libffi_target.so');
+const ptr = ffi.getSymbolPtr(handle, 'add');
+// ptr 是 C 函数的内存地址
+```
+
+## 创建 CFunction 包装
+
+```typescript
+import { CFunction, FFIType } from 'library';
+
+const add = CFunction({
+  args: [FFIType.double, FFIType.double],
+  returns: FFIType.double,
+  ptr: ptr,
+});
+
+add(2.0, 3.0); // → 5.0
+add.close();
+```
+
+## 生命周期
+
+完成后始终关闭包装器：
+
+```typescript
+const fn = CFunction({ ... });
+fn();
+fn.close();
+```
+
+## 传递给 C API
+
+```typescript
+import { CFunction, FFIType } from 'library';
+
+// C: void sort(int* arr, int (*cmp)(int, int));
+const cmp = CFunction({ args: [FFIType.int32, FFIType.int32], returns: FFIType.int32, ptr: cmpPtr });
+ffi.callMixed(handle, 'sort', 'ip', 'v', [arrPtr, cmp.ptr], []);
+```
+
+## 使用 JSCallback 代替
+
+对于 JavaScript 到 C 的回调，使用 `JSCallback`：
+
+```typescript
+const cmp = new JSCallback(
+  (a: number, b: number): number => a - b,
+  { args: [FFIType.int32, FFIType.int32], returns: FFIType.int32 },
+);
+
+ffi.callMixed(handle, 'sort', 'ip', 'v', [arrPtr, cmp.ptr], []);
+cmp.close();
+```

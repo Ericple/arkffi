@@ -1,0 +1,207 @@
+---
+title: "使用外部预构建库"
+description: "集成外部 开发环境 项目编译的 .so 库到 arkffi 项目中"
+---
+
+本指南演示如何将在 开发环境 中独立编译的 C/C++ 库集成到 arkffi 项目中，并通过 `dlopen` 调用其函数。
+
+## 步骤概览
+
+1. 在 开发环境 中创建 C/C++ 库项目
+2. 使用 HarmonyOS NDK 交叉编译为 `arm64-v8a` 架构
+3. 将编译产物放入 `library/libs/arm64-v8a/`
+4. 修改 `CMakeLists.txt` 引入预构建库
+5. 在 ArkTS 中通过 `dlopen` 加载并调用
+
+---
+
+## 1. 创建外部库项目
+
+自行创建 C/C++ 库项目。
+
+**源代码** `library.cpp`：
+
+```c
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+    const char* hello(void) {
+        return "Hello, World!";
+    }
+
+#ifdef __cplusplus
+}
+#endif
+```
+
+<Note>
+`extern "C"` 防止 C++ 编译器对函数名进行改编（name mangling），确保 `dlsym("hello")` 能正确找到符号。如果不加，编译后的符号名会被改成 `_Z5hellov`，导致 `dlopen` 无法识别。
+</Note>
+
+**CMakeLists.txt**：
+
+```cmake
+cmake_minimum_required(VERSION 3.3)
+project(rvohostest)
+set(CMAKE_CXX_STANDARD 14)
+add_library(rvohostest SHARED library.cpp)
+```
+
+## 2. 交叉编译为 HarmonyOS
+
+在 开发环境 中使用 HarmonyOS NDK 的交叉编译器进行编译：
+
+```bash
+# 设置 NDK 工具链路径（根据你的 SDK 实际路径调整）
+export TOOLCHAIN=/Applications/DevEco-Studio.app/contents/sdk/default/openharmony/native/llvm
+export SYSROOT=/Applications/DevEco-Studio.app/contents/sdk/default/openharmony/native/sysroot
+
+# 编译 (arm64-v8a 架构)
+$TOOLCHAIN/bin/aarch64-linux-ohos-clang++ \
+  --sysroot=$SYSROOT \
+  -fPIC \
+  -shared \
+  -o librvohostest.so \
+  library.cpp
+```
+
+<Tip>
+确保使用 HarmonyOS NDK 的 `aarch64-linux-ohos-*` 工具链，而非 macOS 自带的 Clang。`-fPIC` 是编译共享库必需的选项。
+</Tip>
+
+## 3. 放置编译产物
+
+将编译生成的 `librvohostest.so` 放入项目的以下目录：
+
+```
+library/libs/arm64-v8a/librvohostest.so
+```
+
+<Note>
+如果项目还支持 `x86_64` 模拟器，需要在 `library/libs/x86_64/` 下也放置对应架构的编译产物。本示例仅编译 `arm64-v8a`，因此 `abiFilters` 也仅包含此架构。
+</Note>
+
+## 4. 修改 CMakeLists.txt
+
+在 `library/src/main/cpp/CMakeLists.txt` 中，通过 `IMPORTED` 方式引入预构建的 `.so`：
+
+```cmake
+# 原有的 ffi_target 库
+add_library(ffi_target SHARED
+    third_party/ffi_target.c
+)
+
+# ── 新增：引入外部预构建库 ──
+add_library(rvohostest SHARED IMPORTED)
+set_target_properties(rvohostest
+PROPERTIES
+IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/${OHOS_ARCH}/librvohostest.so
+)
+
+# 将外部库链接到主 NAPI 模块
+add_library(library SHARED napi_init.cpp)
+target_link_libraries(library PUBLIC libace_napi.z.so rvohostest)
+```
+
+### 关键说明
+
+| 配置项 | 说明 |
+|---|---|
+| `SHARED IMPORTED` | 声明这是一个已预编译好的共享库，本项目不参与编译 |
+| `IMPORTED_LOCATION` | 指向 `.so` 文件的路径，`${OHOS_ARCH}` 在构建时自动替换为 `arm64-v8a` 或 `x86_64` |
+| `target_link_libraries` | 将外部库链接到 `library`，使得 `librvohostest.so` 随 HAR 模块一起打包到 HAP 中 |
+
+## 5. 配置 abiFilters
+
+确保 `library/build-profile.json5` 中 `abiFilters` 包含编译产物对应的架构：
+
+```json
+{
+  "buildOption": {
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "abiFilters": ["arm64-v8a"]
+    }
+  }
+}
+```
+
+## 6. 在 ArkTS 中调用
+
+确认 `library/src/main/ets/ffi.ts` 导出了需要的类：
+
+```typescript
+export { dlopen, FFIType, CString, CFunction, JSCallback, Library } from './ffi';
+```
+
+## 7. 编写测试用例
+
+在 `library/src/ohosTest/ets/test/FFI.test.ets` 中使用 `dlopen` 加载外部库并调用函数：
+
+```typescript
+import { dlopen, FFIType, CString } from '../../../main/ets/ffi';
+
+it('External Built Library', 0, () => {
+  // 1. dlopen 加载外部共享库。系统会按照以下顺序查找 .so：
+  //    - 应用原生库路径（/data/storage/el1/bundle/libs/arm64/）
+  //    - 系统库路径
+  //    由于我们在 CMakeLists.txt 中链接了 librvohostest.so，
+  //    构建系统会自动将其打包到 HAP 中并部署到上述路径。
+  let lib1 = dlopen("librvohostest.so", {
+
+    // 2. 定义函数签名：hello() 返回 const char*（即 C 字符串指针）
+    //    注意返回类型使用 FFIType.int64，因为函数返回的是指针地址（64 位整数）。
+    //    不能使用 FFIType.CString 作为返回类型——底层类型分发器将其视为字符串参数类型，而非返回类型。
+    hello: { args: [], returns: FFIType.int64 },
+  });
+
+  // 3. 调用函数，获取 C 字符串指针（一个 64 位内存地址）
+  const ptr = lib1.symbols.hello();
+
+  // 4. 通过 CString 将指针转换为 JavaScript 字符串
+  //    CString 内部使用 readCString 读取 null 结尾的 C 字符串
+  const cstr = new CString(ptr);
+
+  // 5. 验证结果
+  expect(cstr.toString()).assertEqual("Hello, World!");
+
+  // 6. 关闭库，释放资源
+  lib1.close();
+});
+```
+
+### 注意事项
+
+<Warning>
+- 返回 `const char*` 的函数**必须**使用 `returns: FFIType.int64` 而非 `returns: FFIType.CString`，因为底层分发器将 `'s'` 编码视为参数类型，不处理为返回类型。
+- 拿到指针后需通过 `CString` 类读取实际字符串内容。
+- 确保库已用 `extern "C"` 编译，否则 `dlsym` 因名字改编而找不到函数。
+- 关闭库后不要再调用其符号，否则行为未定义。
+</Warning>
+
+## 完整示例
+
+请参见项目中的测试用例：
+
+```typescript
+// file: library/src/ohosTest/ets/test/FFI.test.ets
+it('External Built Library', 0, () => {
+  let lib1 = dlopen("librvohostest.so", {
+    hello: { args: [], returns: FFIType.int64 },
+  });
+  const ptr = lib1.symbols.hello();
+  const cstr = new CString(ptr);
+  expect(cstr.toString()).assertEqual("Hello, World!");
+  lib1.close();
+});
+```
+
+## 故障排查
+
+| 问题 | 原因 | 解决 |
+|---|---|---|
+| `dlsym failed: Symbol not found: hello` | C++ name mangling | 在源码中添加 `extern "C"` |
+| `Handle is invalid` | `.so` 未正确打包到 HAP | 检查 `CMakeLists.txt` 中 `IMPORTED_LOCATION` 路径和 `target_link_libraries` |
+| `cannot locate symbol` | `.so` 依赖的运行时库缺失 | 确认使用 HarmonyOS NDK 编译，而非宿主系统工具链 |
+| 调用返回空字符串 | 指针读取错误 | 确认返回类型使用 `FFIType.int64` 而非 `FFIType.CString` |
