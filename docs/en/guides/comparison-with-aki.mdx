@@ -1,0 +1,76 @@
+---
+title: "Comparison with AKI"
+description: "Differences between arkffi and AKI, and their respective strengths"
+---
+
+[AKI (Alpha Kernel Interacting)](https://gitcode.com/CPF-ApplicationTPC/aki) is another FFI framework for HarmonyOS, with a fundamentally different design philosophy from arkffi.
+
+## Architecture Comparison
+
+| Dimension | arkffi | AKI |
+|---|---|---|
+| **Approach** | Runtime FFI via `dlopen`/`dlsym` | Compile-time binding via C++ macros generating NAPI glue code |
+| **Call layer** | Unified ArkTS / TypeScript calls | Macros in C++ side, then call from ArkTS |
+| **C++ code changes required** | **No** — call any exported function directly | **Yes** — add `JSBIND_*` macros in C++ source |
+| **Build impact** | None — `ohpm install arkffi` only | Requires modifying `CMakeLists.txt` |
+| **External pre-built libraries** | ✅ Yes — `dlopen` any `.so` at runtime | ❌ Source must be part of the project build |
+| **Class/struct binding** | ❌ C functions only | ✅ Supports C++ classes, members, properties, enums |
+| **Async primitives** | DIY | ✅ Built-in TaskRunner, AsyncWorker |
+| **Thread-safe callbacks** | ✅ TSFN + trampoline functions, `cb.ptr` returns real address | ✅ Via `aki::threadSafe` |
+| **API style** | bun:ffi compatible (declarative `dlopen`) | C++ macros (`JSBIND_FUNCTION`, `JSBIND_CLASS`) |
+| **Min API version** | API 12+ | API 9+ |
+
+## When to Choose arkffi
+
+### 1. Calling external pre-built `.so` libraries
+
+arkffi's core advantage: **no compilation needed, no source code needed**. When you have a pre-compiled `.so` from a third party (e.g., closed-source SDK, algorithm library compiled via NDK, CLion project output), arkffi can load and call it at runtime:
+
+```typescript
+let lib = dlopen('librvohostest.so', {
+  hello: { args: [], returns: FFIType.int64 },
+});
+lib.symbols.hello();
+lib.close();
+```
+
+AKI cannot do this — it requires all C++ source to be part of the project build.
+
+### 2. Rapid prototyping
+
+arkffi only needs `ohpm install arkffi` — no CMakeLists.txt modifications, no C++ code, no NAPI knowledge required. From install to first C function call in minutes.
+
+### 3. bun:ffi migration or cross-development
+
+If your team is familiar with bun:ffi's `dlopen(path, { funcName: { args, returns } })` declarative style, arkffi provides the exact same API pattern with zero learning cost.
+
+### 4. Dynamic library hot-reload
+
+`ffi.load` / `ffi.close` allows loading and unloading `.so` files at runtime, suitable for plugin systems or dynamic module scenarios.
+
+### 5. Flexible mixed-type calls
+
+arkffi's type encoding system (`'i'`, `'d'`, `'s'`, etc.) supports arbitrary mixed-signature calls in a single invocation, without writing C++ wrappers for each signature:
+
+```typescript
+ffi.callMixed(handle, 'compute', 'ids', 'd', [0, 4.0], ['square']);
+```
+
+## When to Choose AKI
+
+- **Binding C++ classes/structs**: AKI's `JSBIND_CLASS` and `JSBIND_METHOD` can fully expose C++ classes to ArkTS.
+- **Complex async operations**: AKI has built-in `TaskRunner` and `AsyncWorker`.
+- **API 9~11 compatibility**: arkffi requires API 12+.
+- **C++ macro-style preferred**: AKI's compile-time binding is more controllable in large C++ projects.
+
+## Decision Guide
+
+| Scenario | Recommendation |
+|---|---|
+| Calling external closed-source `.so` | **arkffi** |
+| Rapid prototyping, quick integration | **arkffi** |
+| Migrating from bun:ffi | **arkffi** |
+| Binding C++ classes to ArkTS | **AKI** |
+| Compile-time type safety required | **AKI** |
+| API 9~11 old device support | **AKI** |
+| Plugin system, hot-reload | **arkffi** |

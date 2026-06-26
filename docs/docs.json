@@ -39,7 +39,8 @@
               "zh/guides/mixed-types",
               "zh/guides/function-pointers",
               "zh/guides/callbacks",
-              "zh/guides/external-library"
+              "zh/guides/external-library",
+              "zh/guides/comparison-with-aki"
             ]
           },
           {
@@ -78,7 +79,8 @@
               "zh-Hant/guides/mixed-types",
               "zh-Hant/guides/function-pointers",
               "zh-Hant/guides/callbacks",
-              "zh-Hant/guides/external-library"
+              "zh-Hant/guides/external-library",
+              "zh-Hant/guides/comparison-with-aki"
             ]
           },
           {
@@ -117,7 +119,8 @@
               "en/guides/mixed-types",
               "en/guides/function-pointers",
               "en/guides/callbacks",
-              "en/guides/external-library"
+              "en/guides/external-library",
+              "en/guides/comparison-with-aki"
             ]
           },
           {

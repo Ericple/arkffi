@@ -1,0 +1,76 @@
+---
+title: "與 AKI 的對比"
+description: "arkffi 與 AKI 的區別與各自的優勢場景"
+---
+
+[AKI (Alpha Kernel Interacting)](https://gitcode.com/CPF-ApplicationTPC/aki) 是 HarmonyOS 上另一個 FFI 開發框架，與 arkffi 有相似的定位但設計理念完全不同。
+
+## 架構對比
+
+| 維度 | arkffi | AKI |
+|---|---|---|
+| **實現方式** | 運行時 FFI，通過 `dlopen`/`dlsym` 動態加載 | 編譯時綁定，通過 C++ 宏生成 NAPI 膠水代碼 |
+| **調用層** | ArkTS / TypeScript 側統一調用 | C++ 側編寫宏，ArkTS 側調用 |
+| **是否需要修改 C++ 代碼** | **不需要**，直接調用已有 `.so` 的導出函數 | **需要**，在 C++ 源碼中添加 `JSBIND_*` 宏 |
+| **對原生構建的影響** | 無，`ohpm install arkffi` 即可 | 需要修改 `CMakeLists.txt` 添加子目錄或鏈接 HAR |
+| **外部預構建庫** | ✅ 支持，直接 `dlopen` 任意 `.so` | ❌ 需要將源碼納入項目構建 |
+| **類/結構體綁定** | ❌ 僅支持 C 函數調用 | ✅ 支持 C++ 類、成員函數、屬性、枚舉綁定 |
+| **異步原語** | 需自行管理 | ✅ 內置 TaskRunner、AsyncWorker |
+| **線程安全回調** | ✅ TSFN + 蹦牀函數，`cb.ptr` 返回真實函數指針 | ✅ 通過 `aki::threadSafe` 支持 |
+| **API 風格** | bun:ffi 兼容（聲明式 `dlopen`） | C++ 宏 （`JSBIND_FUNCTION`、`JSBIND_CLASS`） |
+| **最低 API 版本** | API 12+ | API 9+ |
+
+## arkffi 的優勢場景
+
+### 1. 調用外部預構建的 `.so` 庫
+
+arkffi 最核心的優勢：**不需要編譯，不需要源碼**。當你有一個由第三方提供的、獨立編譯的 `.so`（比如閉源 SDK、NDK 編譯的算法庫、CLion 工程產物），arkffi 可以直接在運行時加載並調用其函數：
+
+```typescript
+let lib = dlopen('librvohostest.so', {
+  hello: { args: [], returns: FFIType.int64 },
+});
+lib.symbols.hello();
+lib.close();
+```
+
+AKI 無法做到這一點——它要求將所有 C++ 源碼納入項目編譯流程。
+
+### 2. 快速原型開發
+
+arkffi 僅需 `ohpm install arkffi`，無需修改 `CMakeLists.txt`、無需寫 C++、無需理解 NAPI。從安裝到調用第一個 C 函數只需幾分鐘。
+
+### 3. bun:ffi 遷移或交叉開發
+
+如果團隊熟悉 bun:ffi 的 `dlopen(path, { funcName: { args, returns } })` 聲明式風格，arkffi 提供完全相同的 API 模式，學習成本爲零。
+
+### 4. 動態庫熱加載場景
+
+通過 `ffi.load` / `ffi.close` 可在運行時反覆加載和卸載 `.so`，適用於插件系統或動態模塊場景。
+
+### 5. 混合類型參數的靈活調用
+
+arkffi 的類型編碼系統（`'i'`、`'d'`、`'s'` 等）支持任意混合簽名的一次性調用，無需爲每種簽名單獨寫 C++ 包裝：
+
+```typescript
+ffi.callMixed(handle, 'compute', 'ids', 'd', [0, 4.0], ['square']);
+```
+
+## AKI 的優勢場景
+
+- **需要綁定 C++ 類/結構體**：AKI 通過 `JSBIND_CLASS`、`JSBIND_METHOD` 可將 C++ 類完整暴露給 ArkTS。
+- **需要複雜異步操作**：AKI 內置 `TaskRunner` 和 `AsyncWorker`。
+- **兼容 API 9~11 舊版本**：arkffi 需要 API 12+。
+- **團隊熟悉 C++ 宏模式**：AKI 的編譯時綁定方式在大型 C++ 項目中更可控。
+
+## 如何選擇
+
+| 場景 | 推薦 |
+|---|---|
+| 調用外部閉源的 `.so` | **arkffi** |
+| 快速原型、快速集成 | **arkffi** |
+| 從 bun:ffi 遷移 | **arkffi** |
+| 綁定 C++ 類到 ArkTS | **AKI** |
+| 需要 C++ 編譯時類型安全 | **AKI** |
+| 兼容 API 9~11 舊設備 | **AKI** |
+| 插件系統、熱加載 | **arkffi** |
