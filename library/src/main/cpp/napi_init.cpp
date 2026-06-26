@@ -859,6 +859,8 @@ struct AsyncWorkData {
     int32_t i32Result;
     int64_t i64Result;
     double dblResult;
+    napi_async_work work;
+    napi_threadsafe_function resolveTSFN;
 };
 
 static void AsyncExecuteCB(napi_env env, void* data)
@@ -869,7 +871,7 @@ static void AsyncExecuteCB(napi_env env, void* data)
         &w->i32Result, &w->i64Result, &w->dblResult);
 }
 
-static void AsyncCompleteCB(napi_env env, napi_status status, void* data)
+static void AsyncResolveCB(napi_env env, napi_value jsCb, void* context, void* data)
 {
     auto* w = static_cast<AsyncWorkData*>(data);
     napi_value result;
@@ -881,7 +883,20 @@ static void AsyncCompleteCB(napi_env env, napi_status status, void* data)
         napi_create_double(env, w->dblResult, &result);
     napi_resolve_deferred(env, w->deferred, result);
     for (int i = 0; i < w->ns; i++) delete[] w->strBuf[i];
+    if (w->resolveTSFN != nullptr) {
+        napi_release_threadsafe_function(w->resolveTSFN, napi_tsfn_release);
+    }
+    napi_async_work work = w->work;
     delete w;
+    napi_delete_async_work(env, work);
+}
+
+static void AsyncCompleteCB(napi_env env, napi_status status, void* data)
+{
+    auto* w = static_cast<AsyncWorkData*>(data);
+    if (w->resolveTSFN != nullptr) {
+        napi_call_threadsafe_function(w->resolveTSFN, w, napi_tsfn_blocking);
+    }
 }
 
 static napi_value CallAsync(napi_env env, napi_callback_info info)
@@ -986,6 +1001,13 @@ static napi_value CallAsync(napi_env env, napi_callback_info info)
     napi_value promise;
     napi_create_promise(env, &w->deferred, &promise);
 
+    w->resolveTSFN = nullptr;
+    napi_value tsfnName;
+    napi_create_string_utf8(env, "AsyncResolve", NAPI_AUTO_LENGTH, &tsfnName);
+    napi_create_threadsafe_function(env, nullptr, nullptr, tsfnName,
+        0, 1, nullptr, nullptr, nullptr,
+        AsyncResolveCB, &w->resolveTSFN);
+
     napi_async_work work;
     napi_create_async_work(env, nullptr, resourceName,
         AsyncExecuteCB, AsyncCompleteCB, w, &work);
@@ -1077,6 +1099,13 @@ static napi_value CallPtrAsync(napi_env env, napi_callback_info info)
 
     napi_value promise;
     napi_create_promise(env, &w->deferred, &promise);
+
+    w->resolveTSFN = nullptr;
+    napi_value tsfnName;
+    napi_create_string_utf8(env, "AsyncResolve", NAPI_AUTO_LENGTH, &tsfnName);
+    napi_create_threadsafe_function(env, nullptr, nullptr, tsfnName,
+        0, 1, nullptr, nullptr, nullptr,
+        AsyncResolveCB, &w->resolveTSFN);
 
     napi_async_work work;
     napi_create_async_work(env, nullptr, resourceName,

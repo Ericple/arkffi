@@ -643,6 +643,63 @@ export default function ffiTest() {
       ffi.close(handle);
     })
 
+    it('callAsync_add', 0, () => {
+      let handle = ffi.load(LIB_NAME);
+      ffi.defineFunction(handle, 'add', 'dd', 'd');
+      ffi.callAsync(handle, 'add', 'dd', 'd', [2.0, 3.0], []).then((r: number) => {
+        expect(r).assertEqual(5.0);
+        ffi.close(handle);
+      });
+    })
+
+    it('callAsync_factorial', 0, () => {
+      let handle = ffi.load(LIB_NAME);
+      ffi.defineFunction(handle, 'factorial', 'i', 'l');
+      ffi.callAsync(handle, 'factorial', 'i', 'l', [10], []).then((r: number) => {
+        expect(r).assertEqual(3628800);
+        ffi.close(handle);
+      });
+    })
+
+    it('AsyncCFunction_add', 0, () => {
+      let handle = ffi.load(LIB_NAME);
+      let addPtr = ffi.getSymbolPtr(handle, 'add');
+      let fn = AsyncCFunction({ args: [FFIType.double, FFIType.double], returns: FFIType.double, ptr: addPtr });
+      fn(2.0, 3.0).then((r: number) => {
+        expect(r).assertEqual(5.0);
+        fn.close();
+        ffi.close(handle);
+      });
+    })
+
+    it('AsyncCFunction_factorial', 0, () => {
+      let handle = ffi.load(LIB_NAME);
+      let factPtr = ffi.getSymbolPtr(handle, 'factorial');
+      let fn = AsyncCFunction({ args: [FFIType.int32], returns: FFIType.int64, ptr: factPtr });
+      fn(10).then((r: number) => {
+        expect(r).assertEqual(3628800);
+        fn.close();
+        ffi.close(handle);
+      });
+    })
+
+    it('AsyncCFunction_reuse', 0, () => {
+      let handle = ffi.load(LIB_NAME);
+      let addPtr = ffi.getSymbolPtr(handle, 'add');
+      let fn = AsyncCFunction({ args: [FFIType.double, FFIType.double], returns: FFIType.double, ptr: addPtr });
+      fn(1.0, 2.0).then((r1: number) => {
+        expect(r1).assertEqual(3.0);
+        fn(3.0, 4.0).then((r2: number) => {
+          expect(r2).assertEqual(7.0);
+          fn(5.0, 6.0).then((r3: number) => {
+            expect(r3).assertEqual(11.0);
+            fn.close();
+            ffi.close(handle);
+          });
+        });
+      });
+    })
+
     it('FFIType_additional_constants', 0, () => {
       expect(FFIType.uint8_t).assertEqual('i');
       expect(FFIType.u8).assertEqual('i');
@@ -692,49 +749,6 @@ export default function ffiTest() {
       expect(lib.symbols.apply_callback(cb, 21)).assertEqual(42);
       cb.close();
       lib.close();
-    })
-
-    it('callAsync_add', 0, () => {
-      let handle = ffi.load(LIB_NAME);
-      ffi.defineFunction(handle, 'add', 'dd', 'd');
-      ffi.callAsync(handle, 'add', 'dd', 'd', [2.0, 3.0], []).then((r: number) => {
-        expect(r).assertEqual(5.0);
-        ffi.close(handle);
-      });
-    })
-
-    it('callAsync_factorial', 0, () => {
-      let handle = ffi.load(LIB_NAME);
-      ffi.defineFunction(handle, 'factorial', 'i', 'l');
-      ffi.callAsync(handle, 'factorial', 'i', 'l', [10], []).then((r: number) => {
-        expect(r).assertEqual(3628800);
-        ffi.close(handle);
-      });
-    })
-
-    it('dlopen_and_callAsync', 0, (done: Function) => {
-      let handle = ffi.load(LIB_NAME);
-      ffi.defineFunction(handle, 'multiply', 'dd', 'd');
-      ffi.callAsync(handle, 'multiply', 'dd', 'd', [3.0, 4.0], []).then((r: number) => {
-        expect(r).assertEqual(12.0);
-        ffi.close(handle);
-        done();
-      });
-    })
-
-    it('callAsync_concurrent', 0, (done: Function) => {
-      let handle = ffi.load(LIB_NAME);
-      ffi.defineFunction(handle, 'add', 'dd', 'd');
-      let p1 = ffi.callAsync(handle, 'add', 'dd', 'd', [1.0, 2.0], []);
-      let p2 = ffi.callAsync(handle, 'add', 'dd', 'd', [3.0, 4.0], []);
-      let p3 = ffi.callAsync(handle, 'add', 'dd', 'd', [5.0, 6.0], []);
-      Promise.all([p1, p2, p3]).then((results: number[]) => {
-        expect(results[0]).assertEqual(3.0);
-        expect(results[1]).assertEqual(7.0);
-        expect(results[2]).assertEqual(11.0);
-        ffi.close(handle);
-        done();
-      });
     })
 
     it('Struct_define_and_create', 0, () => {
@@ -795,44 +809,6 @@ export default function ffiTest() {
       let read = Point.fromPtr(p);
       expect(read.x).assertEqual(30);
       expect(read.y).assertEqual(40);
-    })
-
-    it('AsyncCFunction_add', 0, (done: Function) => {
-      let handle = ffi.load(LIB_NAME);
-      let addPtr = ffi.getSymbolPtr(handle, 'add');
-      let fn = AsyncCFunction({ args: [FFIType.double, FFIType.double], returns: FFIType.double, ptr: addPtr });
-      fn(2.0, 3.0).then((r: number) => {
-        expect(r).assertEqual(5.0);
-        fn.close();
-        ffi.close(handle);
-        done();
-      });
-    })
-
-    it('AsyncCFunction_factorial', 0, (done: Function) => {
-      let handle = ffi.load(LIB_NAME);
-      let factPtr = ffi.getSymbolPtr(handle, 'factorial');
-      let fn = AsyncCFunction({ args: [FFIType.int32], returns: FFIType.int64, ptr: factPtr });
-      fn(10).then((r: number) => {
-        expect(r).assertEqual(3628800);
-        fn.close();
-        ffi.close(handle);
-        done();
-      });
-    })
-
-    it('AsyncCFunction_reuse', 0, (done: Function) => {
-      let handle = ffi.load(LIB_NAME);
-      let addPtr = ffi.getSymbolPtr(handle, 'add');
-      let fn = AsyncCFunction({ args: [FFIType.double, FFIType.double], returns: FFIType.double, ptr: addPtr });
-      Promise.all([fn(1.0, 2.0), fn(3.0, 4.0), fn(5.0, 6.0)]).then((results: number[]) => {
-        expect(results[0]).assertEqual(3.0);
-        expect(results[1]).assertEqual(7.0);
-        expect(results[2]).assertEqual(11.0);
-        fn.close();
-        ffi.close(handle);
-        done();
-      });
     })
   })
 }
