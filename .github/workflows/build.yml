@@ -8,63 +8,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: peercat/hos-compile-env-linux-amd64
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download HarmonyOS CLI
+      - name: Clone repository
         run: |
-          wget -O ohos_cli.zip \
-            "https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/62/v3/RvvCGfpiRDKldePRc_d2Ng/commandline-tools-linux-x64-6.1.1.280.zip?HW-CC-KV=V1&HW-CC-Date=20260626T012720Z&HW-CC-Expire=315360000&HW-CC-Sign=F17DF691E8BADE4919917C6680AAAD7CB6D68F17A8960D04B6580BB2A98F86D4"
-          mkdir -p "$HOME/ohos-sdk"
-          unzip -q ohos_cli.zip -d "$HOME/ohos-sdk"
-
-      - name: Set up SDK environment
-        run: |
-          SDK_MANAGER=$(find "$HOME/ohos-sdk" -name "sdkmanager" -type f | head -1)
-          if [ -z "$SDK_MANAGER" ]; then
-            SDK_MANAGER=$(find "$HOME/ohos-sdk" -name "sdkmanager.sh" -type f | head -1)
-          fi
-          if [ -n "$SDK_MANAGER" ]; then
-            chmod +x "$SDK_MANAGER"
-            echo "DEVECO_SDK_HOME=$HOME/ohos-sdk" >> "$GITHUB_ENV"
-          fi
-
-          HVIGORW=$(find "$HOME/ohos-sdk" -name "hvigorw.js" -type f | head -1)
-          if [ -z "$HVIGORW" ]; then
-            HVIGORW=$(find "$HOME/ohos-sdk" -name "hvigorw" -type f | head -1)
-          fi
-          if [ -n "$HVIGORW" ]; then
-            chmod +x "$HVIGORW"
-            echo "HVIGORW=$HVIGORW" >> "$GITHUB_ENV"
-          else
-            # Try the npm package from the SDK
-            HVIGOR_DIR=$(find "$HOME/ohos-sdk" -path "*/node_modules/@ohos/hvigor" -type d | head -1)
-            if [ -n "$HVIGOR_DIR" ]; then
-              echo "HVIGOR_DIR=$HVIGOR_DIR" >> "$GITHUB_ENV"
-            fi
-          fi
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
+          git clone https://github.com/Ericple/arkffi.git /workspace
+          cd /workspace
+          git checkout "${{ github.ref_name }}"
 
       - name: Build HAR
         run: |
-          if [ -n "$HVIGORW" ]; then
-            node "$HVIGORW" assembleHar --mode module -p module=library -p buildMode=debug
-          elif [ -n "$HVIGOR_DIR" ]; then
-            node "$HVIGOR_DIR/bin/hvigorw.js" assembleHar --mode module -p module=library -p buildMode=debug
-          else
-            npx @ohos/hvigor assembleHar --mode module -p module=library -p buildMode=debug
-          fi
+          cd /workspace
+          hvigorw assembleHar --mode module -p module=library -p buildMode=debug
 
       - name: Build HAP
         run: |
-          if [ -n "$HVIGORW" ]; then
-            node "$HVIGORW" assembleHap --mode module -p module=entry -p buildMode=debug
-          elif [ -n "$HVIGOR_DIR" ]; then
-            node "$HVIGOR_DIR/bin/hvigorw.js" assembleHap --mode module -p module=entry -p buildMode=debug
-          else
-            npx @ohos/hvigor assembleHap --mode module -p module=entry -p buildMode=debug
-          fi
+          cd /workspace
+          hvigorw assembleHap --mode module -p module=entry -p buildMode=debug
