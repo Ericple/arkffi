@@ -29,6 +29,7 @@ struct CallbackSlot {
     bool active;
     bool threadsafe;
     napi_threadsafe_function tsfn;
+    napi_env env;
 };
 
 static const int MAX_CALLBACK_SLOTS = 16;
@@ -48,7 +49,7 @@ static int32_t TrampolineDispatcher(int slotIdx, int32_t arg)
         return 0;
     }
 
-    napi_env env = g_mainEnv;
+    napi_env env = g_callbackSlots[slotIdx].env;
     if (env == nullptr) return 0;
 
     napi_value jsCb;
@@ -237,7 +238,7 @@ static napi_value DispatchCallFromArrays(napi_env env,
     int64_t int64Buf[4] = {0};
     double dblBuf[4] = {0.0};
     char* strBuf[4] = {nullptr};
-    int ni = 0, nd = 0, ns = 0;
+    int ni = 0, n64 = 0, nd = 0, ns = 0;
     int numIdx = 0, strIdx = 0;
 
     for (size_t k = 0; k < sig.size(); k++) {
@@ -247,11 +248,12 @@ static napi_value DispatchCallFromArrays(napi_env env,
             int64_t val;
             napi_get_value_int64(env, e, &val);
             if (sig[k] == 'l' || sig[k] == 'p' || sig[k] == 'k') {
-                int64Buf[ni] = val;
+                int64Buf[n64] = val;
+                n64++;
             } else {
                 intBuf[ni] = static_cast<int32_t>(val);
+                ni++;
             }
-            ni++;
             numIdx++;
         } else if (sig[k] == 'd' || sig[k] == 'f') {
             napi_get_element(env, numArgs, numIdx, &e);
@@ -645,6 +647,7 @@ static napi_value CreateCallback(napi_env env, napi_callback_info info)
     g_callbackSlots[slotIdx].active = true;
     g_callbackSlots[slotIdx].threadsafe = threadsafe;
     g_callbackSlots[slotIdx].tsfn = nullptr;
+    g_callbackSlots[slotIdx].env = env;
 
     if (threadsafe) {
         InitTrampolines();

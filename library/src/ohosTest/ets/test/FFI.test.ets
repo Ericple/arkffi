@@ -657,5 +657,41 @@ export default function ffiTest() {
       expect(FFIType.callback).assertEqual('k');
       expect(FFIType.usize).assertEqual('l');
     })
+
+    it('CFunction_callback_arg_via_apply_callback', 0, () => {
+      let handle = ffi.load(LIB_NAME);
+      let applyPtr = ffi.getSymbolPtr(handle, 'apply_callback');
+      let cb = new JSCallback((x: number): number => x * 2, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+        threadsafe: true,
+      });
+      let fn = CFunction({
+        args: [FFIType.callback, FFIType.int32],
+        returns: FFIType.int32,
+        ptr: applyPtr,
+      });
+      expect(fn(cb, 21)).assertEqual(42);
+      fn.close();
+      cb.close();
+      ffi.close(handle);
+    })
+
+    it('dlopen_callback_arg_via_apply_callback', 0, () => {
+      let lib = dlopen(LIB_NAME, {
+        apply_callback: {
+          args: [FFIType.callback, FFIType.int32],
+          returns: FFIType.int32,
+        },
+      });
+      let cb = new JSCallback((x: number): number => x * 2, {
+        args: [FFIType.int32],
+        returns: FFIType.int32,
+        threadsafe: true,
+      });
+      expect(lib.symbols.apply_callback(cb, 21)).assertEqual(42);
+      cb.close();
+      lib.close();
+    })
   })
 }
