@@ -14,8 +14,8 @@ jobs:
 
       - name: Download HarmonyOS CLI
         run: |
-          curl -L -o ohos_cli.zip \
-            "https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/0d/v3/s85Ain1uQrWv2NwXJq0Iqg/commandline-tools-linux-x64-26.0.0.461.zip?HW-CC-KV=V1&HW-CC-Date=20260626T004742Z&HW-CC-Expire=315360000&HW-CC-Sign=6A4020EB4E3D0EADB0A417D27EA35FAAA1967A5AB6F8022292A77194305C71C"
+          wget -O ohos_cli.zip \
+            "https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/62/v3/RvvCGfpiRDKldePRc_d2Ng/commandline-tools-linux-x64-6.1.1.280.zip?HW-CC-KV=V1&HW-CC-Date=20260626T012720Z&HW-CC-Expire=315360000&HW-CC-Sign=F17DF691E8BADE4919917C6680AAAD7CB6D68F17A8960D04B6580BB2A98F86D4"
           mkdir -p "$HOME/ohos-sdk"
           unzip -q ohos_cli.zip -d "$HOME/ohos-sdk"
 
