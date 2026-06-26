@@ -5,6 +5,14 @@
       "copyCodeResource": {
         "enable": false
       }
+    },
+    "externalNativeOptions": {
+      "arguments": "",
+      "cppFlags": "",
+      "abiFilters": [
+        "arm64-v8a",
+        "x86_64"
+      ]
     }
   },
   "buildOptionSet": [
@@ -18,6 +26,12 @@
               "./obfuscation-rules.txt"
             ]
           }
+        }
+      },
+      "nativeLib": {
+        "debugSymbol": {
+          "strip": true,
+          "exclude": []
         }
       }
     },

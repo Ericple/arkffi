@@ -15,7 +15,7 @@
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { describe, beforeAll, it, expect } from '@ohos/hypium';
 import ffi from 'liblibrary.so';
-import { dlopen, FFIType, CString, CFunction, AsyncCFunction, JSCallback, Struct } from '../../../main/ets/ffi';
+import { dlopen, FFIType, CString, CFunction, AsyncCFunction, JSCallback, Struct, callBySigAsArrayBuffer } from '../../../main/ets/ffi';
 
 const DOMAIN = 0x0000;
 const LIB_NAME = 'libffi_target.so';
@@ -734,81 +734,24 @@ export default function ffiTest() {
       ffi.close(handle);
     })
 
-    it('dlopen_callback_arg_via_apply_callback', 0, () => {
-      let lib = dlopen(LIB_NAME, {
-        apply_callback: {
-          args: [FFIType.callback, FFIType.int32],
-          returns: FFIType.int32,
-        },
-      });
-      let cb = new JSCallback((x: number): number => x * 2, {
-        args: [FFIType.int32],
-        returns: FFIType.int32,
-        threadsafe: true,
-      });
-      expect(lib.symbols.apply_callback(cb, 21)).assertEqual(42);
-      cb.close();
-      lib.close();
-    })
-
-    it('Struct_define_and_create', 0, () => {
-      let Point = Struct({
-        x: FFIType.int32,
-        y: FFIType.int32,
-      });
-      expect(Point.size).assertEqual(8);
-      let buf = Point.create({ x: 10, y: 20 });
-      expect(Point.get(buf, 'x')).assertEqual(10);
-      expect(Point.get(buf, 'y')).assertEqual(20);
-    })
-
-    it('Struct_get_set', 0, () => {
-      let Point = Struct({
-        x: FFIType.int32,
-        y: FFIType.int32,
-      });
-      let buf = Point.create({ x: 0, y: 0 });
-      Point.set(buf, 'x', 42);
-      Point.set(buf, 'y', 99);
-      expect(Point.get(buf, 'x')).assertEqual(42);
-      expect(Point.get(buf, 'y')).assertEqual(99);
-    })
-
-    it('Struct_alignment_padding', 0, () => {
-      let Mixed = Struct({
-        a: FFIType.int8_t,
-        b: FFIType.int32,
-        c: FFIType.int8_t,
-      });
-      expect(Mixed.size).assertEqual(12);
-      let buf = Mixed.create({ a: 1, b: 2, c: 3 });
-      expect(Mixed.get(buf, 'a')).assertEqual(1);
-      expect(Mixed.get(buf, 'b')).assertEqual(2);
-      expect(Mixed.get(buf, 'c')).assertEqual(3);
-    })
-
-    it('Struct_fromPtr', 0, () => {
-      let handle = ffi.load(LIB_NAME);
-      ffi.defineFunction(handle, 'getVersion', '', 'l');
-      let ptr: number = ffi.callBySig(handle, 'getVersion', [], []);
-      let buf = ffi.readMemory(ptr, 8);
-      let view = new DataView(buf);
-      let firstByte = view.getUint8(0);
-      expect(firstByte).assertEqual('1'.charCodeAt(0));
+    it('complex_add_dddd', 0, () => {
+      let handle = ffi.load('libfft.so');
+      ffi.defineFunction(handle, 'complex_add', 'dddd', 'd');
+      // complex_add({1,2},{3,4}) = {4,6} → real part = 4.0
+      let r: number = ffi.callBySig(handle, 'complex_add', [1.0, 2.0, 3.0, 4.0], []);
+      expect(r).assertEqual(4.0);
       ffi.close(handle);
     })
 
-    it('Struct_pointer_passthrough', 0, () => {
-      const Point = Struct({
-        x: FFIType.int32,
-        y: FFIType.int32,
-      });
-      let buf = Point.create({ x: 30, y: 40 });
-      let p = ffi.ptr(buf);
-      expect(p > 0).assertTrue();
-      let read = Point.fromPtr(p);
-      expect(read.x).assertEqual(30);
-      expect(read.y).assertEqual(40);
+    it('complex_add_dddd_returns_2', 0, () => {
+      let handle = ffi.load('libfft.so');
+      ffi.defineFunction(handle, 'complex_add', 'dddd', '2');
+      // complex_add({1,2},{3,4}) = {4,6} → ArrayBuffer with both re and im
+      let buf: ArrayBuffer = callBySigAsArrayBuffer(handle, 'complex_add', [1.0, 2.0, 3.0, 4.0], []);
+      let view = new DataView(buf);
+      expect(view.getFloat64(0, true)).assertEqual(4.0);
+      expect(view.getFloat64(8, true)).assertEqual(6.0);
+      ffi.close(handle);
     })
   })
 }

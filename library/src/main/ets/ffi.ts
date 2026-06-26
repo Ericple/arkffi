@@ -111,6 +111,16 @@ export function callAsync(
   return ffi.callAsync(handle, funcName, argTypes, returnType, numArgs, strArgs);
 }
 
+export function callBySigAsArrayBuffer(
+  handle: bigint,
+  funcName: string,
+  numArgs: number[],
+  strArgs: string[],
+): ArrayBuffer {
+  let value: any = ffi.callBySig(handle, funcName, numArgs, strArgs);
+  return value as ArrayBuffer;
+}
+
 export function callPtrAsync(
   ptr: number,
   argTypes: string,
