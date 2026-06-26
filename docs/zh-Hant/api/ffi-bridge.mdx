@@ -97,6 +97,18 @@ function callPtr(ptr: number, argTypes: string, returnType: string, numArgs: num
 
 通過原始函數指針調用，跳過 `dlsym()`。
 
+### `callPtrAsync()`
+
+```typescript
+function callPtrAsync(ptr: number, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): Promise<number>;
+```
+
+`callPtr` 的異步版本，在 libuv 工作線程上執行調用，返回 Promise 不阻塞 JS 線程。
+
+```typescript
+ffi.callPtrAsync(addPtr, 'dd', 'd', [2.0, 3.0], []).then(r => console.log(r));
+```
+
 ### `getSymbolPtr()`
 
 ```typescript

@@ -47,6 +47,45 @@ function callAsync(
 | `numArgs` | `number[]` | Numeric arguments |
 | `strArgs` | `string[]` | String arguments |
 
+## `AsyncCFunction`
+
+`AsyncCFunction` is the async counterpart of `CFunction` with the same signature, returning `Promise<number>`. No `defineFunction` needed — works directly with function pointers:
+
+```typescript
+import { AsyncCFunction, FFIType } from 'arkffi';
+import ffi from 'liblibrary.so';
+
+const handle = ffi.load('libffi_target.so');
+const addPtr = ffi.getSymbolPtr(handle, 'add');
+
+const asyncAdd = AsyncCFunction({
+  args: [FFIType.double, FFIType.double],
+  returns: FFIType.double,
+  ptr: addPtr,
+});
+
+asyncAdd(2.0, 3.0).then((r: number) => {
+  console.log(r); // 5.0
+});
+
+Promise.all([asyncAdd(1.0, 2.0), asyncAdd(3.0, 4.0)]).then((results) => {
+  console.log(results); // [3.0, 7.0]
+});
+
+asyncAdd.close();
+ffi.close(handle);
+```
+
+### Comparison
+
+| Feature | `CFunction` | `AsyncCFunction` |
+|---|---|---|
+| Returns | `number` (sync) | `Promise<number>` (async) |
+| Blocks main thread | ✅ Yes | ❌ No |
+| Needs `defineFunction` | ❌ No | ❌ No |
+| Type support | All | All |
+| Close method | `.close()` | `.close()` |
+
 ## Usage with `dlopen`
 
 Functions must be registered via `defineFunction` before making async calls:

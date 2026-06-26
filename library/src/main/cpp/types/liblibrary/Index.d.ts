@@ -37,3 +37,6 @@ export const callAsync: (handle: bigint, funcName: string, argTypes: string,
 export const ptr: (buffer: ArrayBuffer | ArrayBufferView) => number;
 
 export const readMemory: (ptr: number, byteLength: number) => ArrayBuffer;
+
+export const callPtrAsync: (ptr: number, argTypes: string, returnType: string,
+  numArgs: number[], strArgs: string[]) => Promise<number>;

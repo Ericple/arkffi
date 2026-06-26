@@ -15,7 +15,7 @@
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { describe, beforeAll, it, expect } from '@ohos/hypium';
 import ffi from 'liblibrary.so';
-import { dlopen, FFIType, CString, CFunction, JSCallback, Struct } from '../../../main/ets/ffi';
+import { dlopen, FFIType, CString, CFunction, AsyncCFunction, JSCallback, Struct } from '../../../main/ets/ffi';
 
 const DOMAIN = 0x0000;
 const LIB_NAME = 'libffi_target.so';
@@ -795,6 +795,44 @@ export default function ffiTest() {
       let read = Point.fromPtr(p);
       expect(read.x).assertEqual(30);
       expect(read.y).assertEqual(40);
+    })
+
+    it('AsyncCFunction_add', 0, (done: Function) => {
+      let handle = ffi.load(LIB_NAME);
+      let addPtr = ffi.getSymbolPtr(handle, 'add');
+      let fn = AsyncCFunction({ args: [FFIType.double, FFIType.double], returns: FFIType.double, ptr: addPtr });
+      fn(2.0, 3.0).then((r: number) => {
+        expect(r).assertEqual(5.0);
+        fn.close();
+        ffi.close(handle);
+        done();
+      });
+    })
+
+    it('AsyncCFunction_factorial', 0, (done: Function) => {
+      let handle = ffi.load(LIB_NAME);
+      let factPtr = ffi.getSymbolPtr(handle, 'factorial');
+      let fn = AsyncCFunction({ args: [FFIType.int32], returns: FFIType.int64, ptr: factPtr });
+      fn(10).then((r: number) => {
+        expect(r).assertEqual(3628800);
+        fn.close();
+        ffi.close(handle);
+        done();
+      });
+    })
+
+    it('AsyncCFunction_reuse', 0, (done: Function) => {
+      let handle = ffi.load(LIB_NAME);
+      let addPtr = ffi.getSymbolPtr(handle, 'add');
+      let fn = AsyncCFunction({ args: [FFIType.double, FFIType.double], returns: FFIType.double, ptr: addPtr });
+      Promise.all([fn(1.0, 2.0), fn(3.0, 4.0), fn(5.0, 6.0)]).then((results: number[]) => {
+        expect(results[0]).assertEqual(3.0);
+        expect(results[1]).assertEqual(7.0);
+        expect(results[2]).assertEqual(11.0);
+        fn.close();
+        ffi.close(handle);
+        done();
+      });
     })
   })
 }

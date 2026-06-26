@@ -74,3 +74,27 @@ fn(42, 3.14);
 fn.close();
 ffi.close(handle);
 ```
+
+## 异步版本：`AsyncCFunction`
+
+`AsyncCFunction` 签名与 `CFunction` 一致，但返回 `Promise<number>`，在后台线程执行不阻塞主线程。
+
+```typescript
+import { AsyncCFunction, FFIType } from 'arkffi';
+import ffi from 'liblibrary.so';
+
+const handle = ffi.load('lib.so');
+const ptr = ffi.getSymbolPtr(handle, 'calculate');
+const fn = AsyncCFunction({ args: [FFIType.int32, FFIType.double], returns: FFIType.double, ptr });
+
+fn(42, 3.14).then((r: number) => {
+  console.log(r);
+  fn.close();
+  ffi.close(handle);
+});
+```
+
+| 对比 | `CFunction` | `AsyncCFunction` |
+|---|---|---|
+| 返回值 | `number`（同步） | `Promise<number>`（异步） |
+| 阻塞主线程 | ✅ 是 | ❌ 否 |

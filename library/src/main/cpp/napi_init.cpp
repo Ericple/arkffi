@@ -997,6 +997,98 @@ static napi_value CallAsync(napi_env env, napi_callback_info info)
     return promise;
 }
 
+static napi_value CallPtrAsync(napi_env env, napi_callback_info info)
+{
+    size_t argc = 5;
+    napi_value args[5] = {nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    int64_t ptrValue = 0;
+    napi_get_value_int64(env, args[0], &ptrValue);
+
+    size_t typeSize = 0;
+    napi_get_value_string_utf8(env, args[1], nullptr, 0, &typeSize);
+    char* argTypes = new char[typeSize + 1];
+    napi_get_value_string_utf8(env, args[1], argTypes, typeSize + 1, &typeSize);
+
+    size_t retSize = 0;
+    napi_get_value_string_utf8(env, args[2], nullptr, 0, &retSize);
+    char* retType = new char[retSize + 1];
+    napi_get_value_string_utf8(env, args[2], retType, retSize + 1, &retSize);
+
+    auto* w = new AsyncWorkData();
+    w->funcPtr = reinterpret_cast<void*>(ptrValue);
+    w->sig = argTypes;
+    w->returnType = retType[0];
+    w->ns = 0;
+
+    for (size_t k = 0; k < w->sig.size(); k++) {
+        if (w->sig[k] == 'l' || w->sig[k] == 'b' || w->sig[k] == 'c' || w->sig[k] == 'p') {
+            w->sig[k] = 'i';
+        } else if (w->sig[k] == 'f') {
+            w->sig[k] = 'd';
+        }
+    }
+
+    memset(w->intBuf, 0, sizeof(w->intBuf));
+    memset(w->int64Buf, 0, sizeof(w->int64Buf));
+    memset(w->dblBuf, 0, sizeof(w->dblBuf));
+    memset(w->strBuf, 0, sizeof(w->strBuf));
+
+    uint32_t numLen = 0, strLen = 0;
+    napi_get_array_length(env, args[3], &numLen);
+    napi_get_array_length(env, args[4], &strLen);
+
+    int numIdx = 0, strIdx = 0;
+    int ni = 0, n64 = 0, nd = 0, ns = 0;
+    for (size_t k = 0; k < w->sig.size(); k++) {
+        napi_value e;
+        if (w->sig[k] == 'i' || w->sig[k] == 'l' || w->sig[k] == 'b' || w->sig[k] == 'c' || w->sig[k] == 'p' || w->sig[k] == 'k') {
+            napi_get_element(env, args[3], numIdx, &e);
+            int64_t val;
+            napi_get_value_int64(env, e, &val);
+            if (w->sig[k] == 'l' || w->sig[k] == 'p' || w->sig[k] == 'k') {
+                w->int64Buf[n64] = val;
+                n64++;
+            } else {
+                w->intBuf[ni] = static_cast<int32_t>(val);
+                ni++;
+            }
+            numIdx++;
+        } else if (w->sig[k] == 'd' || w->sig[k] == 'f') {
+            napi_get_element(env, args[3], numIdx, &e);
+            napi_get_value_double(env, e, &w->dblBuf[nd]);
+            nd++;
+            numIdx++;
+        } else if (w->sig[k] == 's') {
+            size_t sl = 0;
+            napi_get_element(env, args[4], strIdx, &e);
+            napi_get_value_string_utf8(env, e, nullptr, 0, &sl);
+            w->strBuf[ns] = new char[sl + 1];
+            napi_get_value_string_utf8(env, e, w->strBuf[ns], sl + 1, &sl);
+            ns++;
+            strIdx++;
+        }
+    }
+    w->ns = ns;
+
+    napi_value resourceName;
+    napi_create_string_utf8(env, "CallPtrAsync", NAPI_AUTO_LENGTH, &resourceName);
+
+    napi_value promise;
+    napi_create_promise(env, &w->deferred, &promise);
+
+    napi_async_work work;
+    napi_create_async_work(env, nullptr, resourceName,
+        AsyncExecuteCB, AsyncCompleteCB, w, &work);
+    napi_queue_async_work(env, work);
+
+    delete[] argTypes;
+    delete[] retType;
+
+    return promise;
+}
+
 static napi_value PtrFromTypedArray(napi_env env, napi_callback_info info)
 {
     size_t argc = 1;
@@ -1135,6 +1227,7 @@ static napi_value Init(napi_env env, napi_value exports)
         {"readMemory", nullptr, ReadMemory, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"callCallbackThreadSafe", nullptr, CallCallbackThreadSafe, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"callAsync", nullptr, CallAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"callPtrAsync", nullptr, CallPtrAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;

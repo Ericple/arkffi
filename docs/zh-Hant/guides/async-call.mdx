@@ -47,6 +47,47 @@ function callAsync(
 | `numArgs` | `number[]` | 數值參數 |
 | `strArgs` | `string[]` | 字符串參數 |
 
+## `AsyncCFunction`
+
+`AsyncCFunction` 是 `CFunction` 的異步版本，簽名完全一致，但返回 `Promise<number>`。不需要通過 `defineFunction` 註冊，直接使用函數指針：
+
+```typescript
+import { AsyncCFunction, FFIType } from 'arkffi';
+import ffi from 'liblibrary.so';
+
+const handle = ffi.load('libffi_target.so');
+const addPtr = ffi.getSymbolPtr(handle, 'add');
+
+const asyncAdd = AsyncCFunction({
+  args: [FFIType.double, FFIType.double],
+  returns: FFIType.double,
+  ptr: addPtr,
+});
+
+// 通過 .then 獲取結果
+asyncAdd(2.0, 3.0).then((r: number) => {
+  console.log(r); // 5.0
+});
+
+// 多個調用併發執行
+Promise.all([asyncAdd(1.0, 2.0), asyncAdd(3.0, 4.0)]).then((results) => {
+  console.log(results); // [3.0, 7.0]
+});
+
+asyncAdd.close();
+ffi.close(handle);
+```
+
+### 對比
+
+| 特性 | `CFunction` | `AsyncCFunction` |
+|---|---|---|
+| 返回值 | `number`（同步） | `Promise<number>`（異步） |
+| 阻塞主線程 | ✅ 是 | ❌ 否 |
+| 是否需要 `defineFunction` | ❌ 不需要 | ❌ 不需要 |
+| 參數類型支持 | 全部 | 全部 |
+| 關閉方法 | `.close()` | `.close()` |
+
 ## 與 `dlopen` 配合使用
 
 函數必須通過 `defineFunction` 註冊到註冊表後才能異步調用：

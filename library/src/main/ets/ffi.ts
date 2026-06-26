@@ -111,6 +111,39 @@ export function callAsync(
   return ffi.callAsync(handle, funcName, argTypes, returnType, numArgs, strArgs);
 }
 
+export function callPtrAsync(
+  ptr: number,
+  argTypes: string,
+  returnType: string,
+  numArgs: number[],
+  strArgs: string[],
+): Promise<number> {
+  return ffi.callPtrAsync(ptr, argTypes, returnType, numArgs, strArgs);
+}
+
+export function AsyncCFunction(def: { args: string[]; returns: string; ptr: number }): {
+  (...args: any[]): Promise<number>;
+  close(): void;
+} {
+  let typeStr: string = joinTypes(def.args);
+  let wrapper: any = (...rawArgs: any[]): Promise<number> => {
+    let numArgs: number[] = [];
+    let strArgs: string[] = [];
+    for (let j = 0; j < def.args.length; j++) {
+      if (def.args[j] == 's') {
+        strArgs.push(rawArgs[j] as string);
+      } else if (def.args[j] == 'k') {
+        numArgs.push((rawArgs[j] as any).ptr ?? (rawArgs[j] as number));
+      } else {
+        numArgs.push(rawArgs[j] as number);
+      }
+    }
+    return ffi.callPtrAsync(def.ptr, typeStr, def.returns, numArgs, strArgs);
+  };
+  wrapper.close = (): void => {};
+  return wrapper;
+}
+
 export class JSCallback {
   readonly threadsafe: boolean;
   private handle: number;

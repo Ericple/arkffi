@@ -71,3 +71,27 @@ fn(42, 3.14);
 fn.close();
 ffi.close(handle);
 ```
+
+## Async Version: `AsyncCFunction`
+
+`AsyncCFunction` has the same signature as `CFunction` but returns `Promise<number>`, executing on a background thread without blocking the main thread.
+
+```typescript
+import { AsyncCFunction, FFIType } from 'arkffi';
+import ffi from 'liblibrary.so';
+
+const handle = ffi.load('lib.so');
+const ptr = ffi.getSymbolPtr(handle, 'calculate');
+const fn = AsyncCFunction({ args: ['i', 'd'], returns: 'd', ptr });
+
+fn(42, 3.14).then((r: number) => {
+  console.log(r);
+  fn.close();
+  ffi.close(handle);
+});
+```
+
+| Comparison | `CFunction` | `AsyncCFunction` |
+|---|---|---|
+| Returns | `number` (sync) | `Promise<number>` (async) |
+| Blocks main thread | ✅ Yes | ❌ No |

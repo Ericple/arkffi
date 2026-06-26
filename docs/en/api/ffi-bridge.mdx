@@ -97,6 +97,18 @@ function callPtr(ptr: number, argTypes: string, returnType: string, numArgs: num
 
 Calls a function by its raw pointer, skipping `dlsym()`.
 
+### `callPtrAsync()`
+
+```typescript
+function callPtrAsync(ptr: number, argTypes: string, returnType: string, numArgs: number[], strArgs: string[]): Promise<number>;
+```
+
+Async version of `callPtr` — executes on a libuv worker thread and returns a Promise without blocking the JS thread.
+
+```typescript
+ffi.callPtrAsync(addPtr, 'dd', 'd', [2.0, 3.0], []).then(r => console.log(r));
+```
+
 ### `getSymbolPtr()`
 
 ```typescript
