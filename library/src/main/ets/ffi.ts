@@ -100,6 +100,17 @@ export function ptr(buffer: any): number {
   return ffi.ptr(buffer);
 }
 
+export function callAsync(
+  handle: bigint,
+  funcName: string,
+  argTypes: string,
+  returnType: string,
+  numArgs: number[],
+  strArgs: string[],
+): Promise<number> {
+  return ffi.callAsync(handle, funcName, argTypes, returnType, numArgs, strArgs);
+}
+
 export class JSCallback {
   readonly threadsafe: boolean;
   private handle: number;
@@ -144,6 +155,125 @@ function joinTypes(types: string[]): string {
   return result;
 }
 
+const TYPE_SIZE: Record<string, number> = {
+  'c': 1, 'i': 4, 'l': 8, 'd': 8, 'f': 4, 'b': 1, 's': 8, 'p': 8, 'k': 8,
+};
+
+const TYPE_ALIGN: Record<string, number> = {
+  'c': 1, 'i': 4, 'l': 8, 'd': 8, 'f': 4, 'b': 1, 's': 8, 'p': 8, 'k': 8,
+};
+
+export class StructSchema {
+  readonly fieldNames: string[];
+  readonly fieldTypes: string[];
+  readonly fieldOffsets: number[];
+  readonly size: number;
+
+  constructor(fields: Record<string, string>) {
+    let names: string[] = [];
+    let types: string[] = [];
+    for (let key in fields) {
+      names.push(key);
+      types.push(fields[key]);
+    }
+    this.fieldNames = names;
+    this.fieldTypes = types;
+    this.fieldOffsets = [];
+
+    let offset = 0;
+    let maxAlign = 1;
+    for (let i = 0; i < names.length; i++) {
+      let t = types[i];
+      let align = TYPE_ALIGN[t] ?? 4;
+      let size = TYPE_SIZE[t] ?? 4;
+      if (align > maxAlign) maxAlign = align;
+      let padding = (align - (offset % align)) % align;
+      this.fieldOffsets.push(offset + padding);
+      offset += padding + size;
+    }
+    let finalPad = (maxAlign - (offset % maxAlign)) % maxAlign;
+    this.size = offset + finalPad;
+  }
+
+  create(obj: Record<string, number | bigint>): ArrayBuffer {
+    let buf = new ArrayBuffer(this.size);
+    let view = new DataView(buf);
+    for (let i = 0; i < this.fieldNames.length; i++) {
+      let name = this.fieldNames[i];
+      let t = this.fieldTypes[i];
+      let off = this.fieldOffsets[i];
+      let val = obj[name] as number;
+      if (t == 'i' || t == 'b' || t == 'c') {
+        view.setInt32(off, val, true);
+      } else if (t == 'l') {
+        view.setBigInt64(off, BigInt(val), true);
+      } else if (t == 'd') {
+        view.setFloat64(off, val, true);
+      } else if (t == 'f') {
+        view.setFloat32(off, val, true);
+      } else if (t == 's' || t == 'p' || t == 'k') {
+        view.setBigInt64(off, BigInt(val), true);
+      }
+    }
+    return buf;
+  }
+
+  fromPtr(ptr: number, byteOffset?: number): Record<string, number> {
+    let base = byteOffset ?? 0;
+    let buf = ffi.readMemory(ptr + base, this.size);
+    let view = new DataView(buf);
+    let result: Record<string, number> = {};
+    for (let i = 0; i < this.fieldNames.length; i++) {
+      let name = this.fieldNames[i];
+      let t = this.fieldTypes[i];
+      let off = this.fieldOffsets[i];
+      if (t == 'i' || t == 'b' || t == 'c') {
+        result[name] = view.getInt32(off, true);
+      } else if (t == 'l') {
+        result[name] = Number(view.getBigInt64(off, true));
+      } else if (t == 'd') {
+        result[name] = view.getFloat64(off, true);
+      } else if (t == 'f') {
+        result[name] = view.getFloat32(off, true);
+      } else if (t == 's' || t == 'p' || t == 'k') {
+        result[name] = Number(view.getBigInt64(off, true));
+      }
+    }
+    return result;
+  }
+
+  get(buf: ArrayBuffer, field: string): number {
+    let idx = this.fieldNames.indexOf(field);
+    if (idx < 0) return 0;
+    let view = new DataView(buf);
+    let off = this.fieldOffsets[idx];
+    let t = this.fieldTypes[idx];
+    if (t == 'i' || t == 'b' || t == 'c') return view.getInt32(off, true);
+    if (t == 'l') return Number(view.getBigInt64(off, true));
+    if (t == 'd') return view.getFloat64(off, true);
+    if (t == 'f') return view.getFloat32(off, true);
+    if (t == 's' || t == 'p' || t == 'k') return Number(view.getBigInt64(off, true));
+    return 0;
+  }
+
+  set(buf: ArrayBuffer, field: string, value: number): void {
+    let idx = this.fieldNames.indexOf(field);
+    if (idx < 0) return;
+    let view = new DataView(buf);
+    let off = this.fieldOffsets[idx];
+    let t = this.fieldTypes[idx];
+    if (t == 'i' || t == 'b' || t == 'c') view.setInt32(off, value, true);
+    else if (t == 'l') view.setBigInt64(off, BigInt(value), true);
+    else if (t == 'd') view.setFloat64(off, value, true);
+    else if (t == 'f') view.setFloat32(off, value, true);
+    else if (t == 's' || t == 'p' || t == 'k') view.setBigInt64(off, BigInt(value), true);
+  }
+}
+
+export function Struct(fields: Record<string, string>): StructSchema {
+  return new StructSchema(fields);
+}
+
 export class Library<Fns extends Record<string, LooseFFIDef>> {
   readonly symbols: ConvertFns<Fns>;
   private handle: bigint;
@@ -184,6 +314,24 @@ export function dlopen<Fns extends Record<string, LooseFFIDef>>(
           }
         }
         return ffi.callBySig(handle, name, numArgs, strArgs);
+      },
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+
+    Object.defineProperty(symbols[name], 'async', {
+      value: (...rawArgs: any[]): Promise<number> => {
+        let numArgs: number[] = [];
+        let strArgs: string[] = [];
+        for (let j = 0; j < def.args.length; j++) {
+          if (def.args[j] == 's') {
+            strArgs.push(rawArgs[j] as string);
+          } else {
+            numArgs.push(extractArg(rawArgs[j], def.args[j]));
+          }
+        }
+        return ffi.callAsync(handle, name, typeStr, def.returns, numArgs, strArgs);
       },
       writable: true,
       enumerable: true,

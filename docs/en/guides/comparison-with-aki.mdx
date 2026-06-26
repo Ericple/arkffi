@@ -14,8 +14,8 @@ description: "Differences between arkffi and AKI, and their respective strengths
 | **C++ code changes required** | **No** — call any exported function directly | **Yes** — add `JSBIND_*` macros in C++ source |
 | **Build impact** | None — `ohpm install arkffi` only | Requires modifying `CMakeLists.txt` |
 | **External pre-built libraries** | ✅ Yes — `dlopen` any `.so` at runtime | ❌ Source must be part of the project build |
-| **Class/struct binding** | ❌ C functions only | ✅ Supports C++ classes, members, properties, enums |
-| **Async primitives** | DIY | ✅ Built-in TaskRunner, AsyncWorker |
+| **Class/struct binding** | ✅ POD struct via `Struct()` (pure ArkTS, runtime serialization) | ✅ Supports C++ classes, members, properties, enums |
+| **Async primitives** | ✅ `callAsync` + `Promise` (via `napi_async_work`) | ✅ Built-in TaskRunner, AsyncWorker |
 | **Thread-safe callbacks** | ✅ TSFN + trampoline functions, `cb.ptr` returns real address | ✅ Via `aki::threadSafe` |
 | **API style** | bun:ffi compatible (declarative `dlopen`) | C++ macros (`JSBIND_FUNCTION`, `JSBIND_CLASS`) |
 | **Min API version** | API 12+ | API 9+ |

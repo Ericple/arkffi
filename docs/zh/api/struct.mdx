@@ -1,0 +1,120 @@
+---
+title: "Struct"
+description: "在 ArkTS 中定义和操作 C 结构体"
+---
+
+`Struct` 定义 C 结构体的内存布局，支持序列化/反序列化，可与 `ffi.ptr` 配合传递给 C 函数。
+
+## 示例
+
+```typescript
+import { Struct, FFIType, ffi } from 'arkffi';
+
+// 定义结构体
+const Point = Struct({
+  x: FFIType.int32,
+  y: FFIType.int32,
+});
+
+// 创建实例
+const buf = Point.create({ x: 10, y: 20 });
+const ptr = ffi.ptr(buf); // 获取指针，传给 C 函数
+
+// 从 C 指针读取
+const read = Point.fromPtr(somePtr);
+console.log(read.x, read.y);
+```
+
+## Struct()
+
+```typescript
+function Struct(fields: Record<string, string>): StructSchema;
+```
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `fields` | `Record<string, string>` | 字段名到类型编码的映射，如 `{ x: FFIType.int32, y: FFIType.int32 }` |
+
+## StructSchema
+
+### `size`
+
+```typescript
+readonly size: number;
+```
+
+结构体总大小（字节），包含对齐填充。
+
+### `create()`
+
+```typescript
+create(obj: Record<string, number | bigint>): ArrayBuffer;
+```
+
+将对象序列化为 `ArrayBuffer`。
+
+### `fromPtr()`
+
+```typescript
+fromPtr(ptr: number, byteOffset?: number): Record<string, number>;
+```
+
+从原始指针读取结构体数据并反序列化为对象。
+
+### `get()`
+
+```typescript
+get(buf: ArrayBuffer, field: string): number;
+```
+
+从 `ArrayBuffer` 中读取单个字段。
+
+### `set()`
+
+```typescript
+set(buf: ArrayBuffer, field: string, value: number): void;
+```
+
+设置 `ArrayBuffer` 中单个字段的值。
+
+## ARM64 对齐规则
+
+| 类型编码 | C 类型 | 大小 | 对齐 |
+|---|---|---|---|
+| `c` | `char` / `int8_t` | 1 | 1 |
+| `i` | `int32_t` / `int` | 4 | 4 |
+| `l` | `int64_t` / `uint64_t` | 8 | 8 |
+| `d` | `double` | 8 | 8 |
+| `f` | `float` | 4 | 4 |
+| `b` | `bool` | 1 | 1 |
+| `s` | `const char*`（指针） | 8 | 8 |
+| `p` / `k` | `void*` / 函数指针 | 8 | 8 |
+
+```typescript
+const Mixed = Struct({
+  a: FFIType.int8_t,     // offset 0, size 1
+  b: FFIType.int32,       // offset 4 (3 byte padding), size 4
+  c: FFIType.int8_t,      // offset 8, size 1
+});                        // total 12 bytes (3 byte final padding)
+
+const buf = Mixed.create({ a: 1, b: 2, c: 3 });
+```
+
+## 与 C 函数配合
+
+```typescript
+// C: void setPoint(struct Point* p, int x, int y)
+// 或者 C: double distance(struct Point a, struct Point b)
+// ARM64 上小型结构体通过寄存器传递，大型结构体通过指针
+
+const Point = Struct({ x: 'i', y: 'i' });
+const lib = dlopen('lib.so', {
+  setPoint: { args: [FFIType.ptr, FFIType.int32, FFIType.int32], returns: 'i' },
+});
+
+const buf = Point.create({ x: 0, y: 0 });
+lib.symbols.setPoint(ffi.ptr(buf), 42, 99);
+
+const result = Point.fromPtr(ffi.ptr(buf));
+console.log(result.x, result.y); // 42, 99
+```

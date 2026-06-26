@@ -1,0 +1,77 @@
+---
+title: "Async Calls"
+description: "Call native C functions without blocking the JS thread"
+---
+
+## Sync vs Async
+
+arkffi's default C function calls are **synchronous** — `lib.symbols.add(2.0, 3.0)` blocks the current thread until the function returns.
+
+For expensive operations (complex computation, I/O), use **`callAsync`** to offload the call to a libuv worker thread and get a Promise back.
+
+## `ffi.callAsync`
+
+```typescript
+import ffi from 'liblibrary.so';
+
+const handle = ffi.load('libffi_target.so');
+ffi.defineFunction(handle, 'factorial', 'i', 'l');
+
+ffi.callAsync(handle, 'factorial', 'i', 'l', [10], []).then((r: number) => {
+  console.log(r); // 3628800
+  ffi.close(handle);
+});
+```
+
+### Syntax
+
+```typescript
+function callAsync(
+  handle: bigint,
+  funcName: string,
+  argTypes: string,
+  returnType: string,
+  numArgs: number[],
+  strArgs: string[],
+): Promise<number>;
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `handle` | `bigint` | Library handle from `ffi.load()` |
+| `funcName` | `string` | Function name (must be registered via `defineFunction`) |
+| `argTypes` | `string` | Argument type codes |
+| `returnType` | `string` | Return type code |
+| `numArgs` | `number[]` | Numeric arguments |
+| `strArgs` | `string[]` | String arguments |
+
+## Usage with `dlopen`
+
+Functions must be registered via `defineFunction` before making async calls:
+
+```typescript
+const handle = ffi.load('libffi_target.so');
+ffi.defineFunction(handle, 'add', 'dd', 'd');
+
+const p1 = ffi.callAsync(handle, 'add', 'dd', 'd', [1.0, 2.0], []);
+const p2 = ffi.callAsync(handle, 'add', 'dd', 'd', [3.0, 4.0], []);
+Promise.all([p1, p2]).then(([r1, r2]) => {
+  console.log(r1, r2);
+  ffi.close(handle);
+});
+```
+
+## Implementation
+
+1. `callAsync` parses arguments on the JS thread and creates a `napi_async_work`
+2. The worker thread executes `DispatchCallRaw` — a pure C function pointer call with no NAPI involvement
+3. On completion, the Promise is resolved on the JS thread
+4. The JS main thread is never blocked
+
+## Limitations
+
+- String return types are not supported (no async version of `callString`)
+- Callbacks (`JSCallback`) cannot be invoked from the async worker thread
+- The function must be registered via `defineFunction` first

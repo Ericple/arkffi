@@ -1,0 +1,109 @@
+---
+title: "Struct"
+description: "Define and manipulate C structs in ArkTS"
+---
+
+`Struct` defines the memory layout of a C struct, supporting serialization/deserialization. It works with `ffi.ptr` to pass data to C functions.
+
+## Example
+
+```typescript
+import { Struct, FFIType, ffi } from 'arkffi';
+
+const Point = Struct({
+  x: FFIType.int32,
+  y: FFIType.int32,
+});
+
+const buf = Point.create({ x: 10, y: 20 });
+const ptr = ffi.ptr(buf); // pass to C function
+
+const read = Point.fromPtr(somePtr);
+console.log(read.x, read.y);
+```
+
+## Struct()
+
+```typescript
+function Struct(fields: Record<string, string>): StructSchema;
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `fields` | `Record<string, string>` | Field name to type code mapping |
+
+## StructSchema
+
+### `size`
+
+```typescript
+readonly size: number;
+```
+
+Total size of the struct in bytes, including padding.
+
+### `create()`
+
+```typescript
+create(obj: Record<string, number | bigint>): ArrayBuffer;
+```
+
+Serialize an object to an ArrayBuffer.
+
+### `fromPtr()`
+
+```typescript
+fromPtr(ptr: number, byteOffset?: number): Record<string, number>;
+```
+
+Read struct data from a raw pointer and deserialize.
+
+### `get()`
+
+```typescript
+get(buf: ArrayBuffer, field: string): number;
+```
+
+Read a single field from an ArrayBuffer.
+
+### `set()`
+
+```typescript
+set(buf: ArrayBuffer, field: string, value: number): void;
+```
+
+Set a single field in an ArrayBuffer.
+
+## ARM64 Alignment Rules
+
+| Type Code | C Type | Size | Align |
+|---|---|---|---|
+| `c` | `char` / `int8_t` | 1 | 1 |
+| `i` | `int32_t` / `int` | 4 | 4 |
+| `l` | `int64_t` / `uint64_t` | 8 | 8 |
+| `d` | `double` | 8 | 8 |
+| `f` | `float` | 4 | 4 |
+| `b` | `bool` | 1 | 1 |
+| `s` | `const char*` (pointer) | 8 | 8 |
+| `p` / `k` | `void*` / function pointer | 8 | 8 |
+
+```typescript
+const Mixed = Struct({ a: 'c', b: 'i', c: 'c' });
+// a at offset 0 (1 byte), b at offset 4 (3 pad), c at offset 8 (1 byte)
+// total = 12 bytes
+```
+
+## Working with C Functions
+
+```typescript
+const Point = Struct({ x: 'i', y: 'i' });
+const lib = dlopen('lib.so', {
+  setPoint: { args: [FFIType.ptr, FFIType.int32, FFIType.int32], returns: 'i' },
+});
+
+const buf = Point.create({ x: 0, y: 0 });
+lib.symbols.setPoint(ffi.ptr(buf), 42, 99);
+
+const result = Point.fromPtr(ffi.ptr(buf));
+console.log(result.x, result.y); // 42, 99
+```

@@ -14,8 +14,8 @@ description: "arkffi 與 AKI 的區別與各自的優勢場景"
 | **是否需要修改 C++ 代碼** | **不需要**，直接調用已有 `.so` 的導出函數 | **需要**，在 C++ 源碼中添加 `JSBIND_*` 宏 |
 | **對原生構建的影響** | 無，`ohpm install arkffi` 即可 | 需要修改 `CMakeLists.txt` 添加子目錄或鏈接 HAR |
 | **外部預構建庫** | ✅ 支持，直接 `dlopen` 任意 `.so` | ❌ 需要將源碼納入項目構建 |
-| **類/結構體綁定** | ❌ 僅支持 C 函數調用 | ✅ 支持 C++ 類、成員函數、屬性、枚舉綁定 |
-| **異步原語** | 需自行管理 | ✅ 內置 TaskRunner、AsyncWorker |
+| **類/結構體綁定** | ✅ POD 結構體通過 `Struct()` 支持（純 ArkTS，運行時序列化） | ✅ 支持 C++ 類、成員函數、屬性、枚舉綁定 |
+| **異步原語** | ✅ `callAsync` + `Promise`（基於 `napi_async_work`） | ✅ 內置 TaskRunner、AsyncWorker |
 | **線程安全回調** | ✅ TSFN + 蹦牀函數，`cb.ptr` 返回真實函數指針 | ✅ 通過 `aki::threadSafe` 支持 |
 | **API 風格** | bun:ffi 兼容（聲明式 `dlopen`） | C++ 宏 （`JSBIND_FUNCTION`、`JSBIND_CLASS`） |
 | **最低 API 版本** | API 12+ | API 9+ |

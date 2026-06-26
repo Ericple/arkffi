@@ -31,4 +31,9 @@ export const getCallbackPtr: (handle: number) => number;
 
 export const callCallbackThreadSafe: (handle: number, arg: number) => void;
 
+export const callAsync: (handle: bigint, funcName: string, argTypes: string,
+  returnType: string, numArgs: number[], strArgs: string[]) => Promise<number>;
+
 export const ptr: (buffer: ArrayBuffer | ArrayBufferView) => number;
+
+export const readMemory: (ptr: number, byteLength: number) => ArrayBuffer;

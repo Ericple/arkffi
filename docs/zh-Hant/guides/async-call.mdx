@@ -1,0 +1,77 @@
+---
+title: "異步調用"
+description: "在不阻塞 JS 線程的情況下調用原生 C 函數"
+---
+
+## 同步 vs 異步
+
+arkffi 默認的 C 函數調用是**同步**的——`lib.symbols.add(2.0, 3.0)` 會阻塞當前線程直到函數返回。
+
+對於耗時操作（複雜計算、I/O），可以使用 **`callAsync`** 將調用卸載到 libuv 工作線程，返回一個 Promise。
+
+## `ffi.callAsync`
+
+```typescript
+import ffi from 'liblibrary.so';
+
+const handle = ffi.load('libffi_target.so');
+ffi.defineFunction(handle, 'factorial', 'i', 'l');
+
+ffi.callAsync(handle, 'factorial', 'i', 'l', [10], []).then((r: number) => {
+  console.log(r); // 3628800
+  ffi.close(handle);
+});
+```
+
+### 語法
+
+```typescript
+function callAsync(
+  handle: bigint,
+  funcName: string,
+  argTypes: string,
+  returnType: string,
+  numArgs: number[],
+  strArgs: string[],
+): Promise<number>;
+```
+
+### 參數
+
+| 參數 | 類型 | 說明 |
+|---|---|---|
+| `handle` | `bigint` | `ffi.load()` 返回的庫句柄 |
+| `funcName` | `string` | 函數名（必須已通過 `defineFunction` 註冊） |
+| `argTypes` | `string` | 參數類型編碼 |
+| `returnType` | `string` | 返回類型編碼 |
+| `numArgs` | `number[]` | 數值參數 |
+| `strArgs` | `string[]` | 字符串參數 |
+
+## 與 `dlopen` 配合使用
+
+函數必須通過 `defineFunction` 註冊到註冊表後才能異步調用：
+
+```typescript
+const handle = ffi.load('libffi_target.so');
+ffi.defineFunction(handle, 'add', 'dd', 'd');
+
+const p1 = ffi.callAsync(handle, 'add', 'dd', 'd', [1.0, 2.0], []);
+const p2 = ffi.callAsync(handle, 'add', 'dd', 'd', [3.0, 4.0], []);
+Promise.all([p1, p2]).then(([r1, r2]) => {
+  console.log(r1, r2);
+  ffi.close(handle);
+});
+```
+
+## 實現原理
+
+1. `callAsync` 在 JS 線程解析參數並創建 `napi_async_work`
+2. 工作線程上執行 `DispatchCallRaw`——純 C 函數指針調用，不涉及 NAPI
+3. 完成後在 JS 線程上 resolve Promise
+4. 整個過程中 JS 主線程不被阻塞
+
+## 限制
+
+- 不支持字符串返回類型（`callString` 無異步版本）
+- 回調函數（`JSCallback`）不能在異步工作線程中調用
+- 必須先將函數通過 `defineFunction` 註冊

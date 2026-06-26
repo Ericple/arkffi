@@ -15,14 +15,14 @@
         "default": true,
         "groups": [
           {
-            "group": "快速开始",
+            "group": "\u5feb\u901f\u5f00\u59cb",
             "pages": [
               "zh/index",
               "zh/getting-started"
             ]
           },
           {
-            "group": "API 参考",
+            "group": "API \u53c2\u8003",
             "pages": [
               "zh/api/dlopen",
               "zh/api/library",
@@ -30,21 +30,23 @@
               "zh/api/cstring",
               "zh/api/cfunction",
               "zh/api/jscallback",
+              "zh/api/struct",
               "zh/api/ffi-bridge"
             ]
           },
           {
-            "group": "指南",
+            "group": "\u6307\u5357",
             "pages": [
               "zh/guides/mixed-types",
               "zh/guides/function-pointers",
               "zh/guides/callbacks",
+              "zh/guides/async-call",
               "zh/guides/external-library",
               "zh/guides/comparison-with-aki"
             ]
           },
           {
-            "group": "示例",
+            "group": "\u793a\u4f8b",
             "pages": [
               "zh/examples/complete"
             ]
@@ -55,14 +57,14 @@
         "language": "zh-Hant",
         "groups": [
           {
-            "group": "快速開始",
+            "group": "\u5feb\u901f\u958b\u59cb",
             "pages": [
               "zh-Hant/index",
               "zh-Hant/getting-started"
             ]
           },
           {
-            "group": "API 參考",
+            "group": "API \u53c3\u8003",
             "pages": [
               "zh-Hant/api/dlopen",
               "zh-Hant/api/library",
@@ -70,21 +72,23 @@
               "zh-Hant/api/cstring",
               "zh-Hant/api/cfunction",
               "zh-Hant/api/jscallback",
+              "zh-Hant/api/struct",
               "zh-Hant/api/ffi-bridge"
             ]
           },
           {
-            "group": "指南",
+            "group": "\u6307\u5357",
             "pages": [
               "zh-Hant/guides/mixed-types",
               "zh-Hant/guides/function-pointers",
               "zh-Hant/guides/callbacks",
+              "zh-Hant/guides/async-call",
               "zh-Hant/guides/external-library",
               "zh-Hant/guides/comparison-with-aki"
             ]
           },
           {
-            "group": "範例",
+            "group": "\u7bc4\u4f8b",
             "pages": [
               "zh-Hant/examples/complete"
             ]
@@ -110,6 +114,7 @@
               "en/api/cstring",
               "en/api/cfunction",
               "en/api/jscallback",
+              "en/api/struct",
               "en/api/ffi-bridge"
             ]
           },
@@ -119,6 +124,7 @@
               "en/guides/mixed-types",
               "en/guides/function-pointers",
               "en/guides/callbacks",
+              "en/guides/async-call",
               "en/guides/external-library",
               "en/guides/comparison-with-aki"
             ]

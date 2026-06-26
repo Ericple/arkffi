@@ -404,6 +404,103 @@ static napi_value DispatchCallFromArrays(napi_env env,
     return result;
 }
 
+static void DispatchCallRaw(void* func, const std::string& sig, char ret,
+    int32_t* intBuf, int64_t* int64Buf, double* dblBuf, char** strBuf, int ns,
+    int32_t* outI32, int64_t* outI64, double* outDbl)
+{
+    if (sig == "dd") {
+        typedef double (*F)(double, double);
+        *outDbl = reinterpret_cast<F>(func)(dblBuf[0], dblBuf[1]);
+    } else if (sig == "d") {
+        typedef double (*F)(double);
+        *outDbl = reinterpret_cast<F>(func)(dblBuf[0]);
+    } else if (sig == "") {
+        if (ret == 'i') {
+            typedef int32_t (*F)();
+            *outI32 = reinterpret_cast<F>(func)();
+        } else if (ret == 'l') {
+            typedef int64_t (*F)();
+            *outI64 = reinterpret_cast<F>(func)();
+        } else {
+            typedef double (*F)();
+            *outDbl = reinterpret_cast<F>(func)();
+        }
+    } else if (sig == "ii") {
+        if (ret == 'i') {
+            typedef int32_t (*F)(int32_t, int32_t);
+            *outI32 = reinterpret_cast<F>(func)(intBuf[0], intBuf[1]);
+        } else if (ret == 'l') {
+            typedef int64_t (*F)(int32_t, int32_t);
+            *outI64 = reinterpret_cast<F>(func)(intBuf[0], intBuf[1]);
+        } else {
+            typedef double (*F)(int32_t, int32_t);
+            *outDbl = reinterpret_cast<F>(func)(intBuf[0], intBuf[1]);
+        }
+    } else if (sig == "i") {
+        if (ret == 'l') {
+            typedef int64_t (*F)(int32_t);
+            *outI64 = reinterpret_cast<F>(func)(intBuf[0]);
+        } else if (ret == 'i') {
+            typedef int32_t (*F)(int32_t);
+            *outI32 = reinterpret_cast<F>(func)(intBuf[0]);
+        } else {
+            typedef double (*F)(int32_t);
+            *outDbl = reinterpret_cast<F>(func)(intBuf[0]);
+        }
+    } else if (sig == "id") {
+        typedef double (*F)(int32_t, double);
+        *outDbl = reinterpret_cast<F>(func)(intBuf[0], dblBuf[0]);
+    } else if (sig == "di") {
+        typedef double (*F)(double, int32_t);
+        *outDbl = reinterpret_cast<F>(func)(dblBuf[0], intBuf[0]);
+    } else if (sig == "ki") {
+        if (ret == 'i') {
+            typedef int32_t (*F)(int64_t, int32_t);
+            *outI32 = reinterpret_cast<F>(func)(int64Buf[0], intBuf[0]);
+        } else {
+            typedef double (*F)(int64_t, int32_t);
+            *outDbl = reinterpret_cast<F>(func)(int64Buf[0], intBuf[0]);
+        }
+    } else if (sig == "k") {
+        if (ret == 'i') {
+            typedef int32_t (*F)(int64_t);
+            *outI32 = reinterpret_cast<F>(func)(int64Buf[0]);
+        } else {
+            typedef double (*F)(int64_t);
+            *outDbl = reinterpret_cast<F>(func)(int64Buf[0]);
+        }
+    } else if (sig == "ids") {
+        typedef double (*F)(int32_t, double, const char*);
+        *outDbl = reinterpret_cast<F>(func)(intBuf[0], dblBuf[0], strBuf[0]);
+    } else if (sig == "sid") {
+        typedef double (*F)(const char*, int32_t, double);
+        *outDbl = reinterpret_cast<F>(func)(strBuf[0], intBuf[0], dblBuf[0]);
+    } else if (sig == "isd") {
+        typedef double (*F)(int32_t, const char*, double);
+        *outDbl = reinterpret_cast<F>(func)(intBuf[0], strBuf[0], dblBuf[0]);
+    } else if (sig == "iid") {
+        typedef double (*F)(int32_t, int32_t, double);
+        *outDbl = reinterpret_cast<F>(func)(intBuf[0], intBuf[1], dblBuf[0]);
+    } else if (sig == "idi") {
+        typedef double (*F)(int32_t, double, int32_t);
+        *outDbl = reinterpret_cast<F>(func)(intBuf[0], dblBuf[0], intBuf[1]);
+    } else if (sig == "s") {
+        typedef double (*F)(const char*);
+        *outDbl = reinterpret_cast<F>(func)(strBuf[0]);
+    } else if (sig == "ss") {
+        if (ret == 'i') {
+            typedef int32_t (*F)(const char*, const char*);
+            *outI32 = reinterpret_cast<F>(func)(strBuf[0], strBuf[1]);
+        } else {
+            typedef double (*F)(const char*, const char*);
+            *outDbl = reinterpret_cast<F>(func)(strBuf[0], strBuf[1]);
+        }
+    } else if (sig == "idid") {
+        typedef double (*F)(int32_t, double, int32_t, double);
+        *outDbl = reinterpret_cast<F>(func)(intBuf[0], dblBuf[0], intBuf[1], dblBuf[1]);
+    }
+}
+
 static napi_value CallBySig(napi_env env, napi_callback_info info)
 {
     size_t argc = 4;
@@ -749,6 +846,157 @@ static napi_value GetCallbackThreadsafe(napi_env env, napi_callback_info info)
     return result;
 }
 
+struct AsyncWorkData {
+    napi_deferred deferred;
+    void* funcPtr;
+    std::string sig;
+    char returnType;
+    int32_t intBuf[4];
+    int64_t int64Buf[4];
+    double dblBuf[4];
+    char* strBuf[4];
+    int ns;
+    int32_t i32Result;
+    int64_t i64Result;
+    double dblResult;
+};
+
+static void AsyncExecuteCB(napi_env env, void* data)
+{
+    auto* w = static_cast<AsyncWorkData*>(data);
+    DispatchCallRaw(w->funcPtr, w->sig, w->returnType,
+        w->intBuf, w->int64Buf, w->dblBuf, w->strBuf, w->ns,
+        &w->i32Result, &w->i64Result, &w->dblResult);
+}
+
+static void AsyncCompleteCB(napi_env env, napi_status status, void* data)
+{
+    auto* w = static_cast<AsyncWorkData*>(data);
+    napi_value result;
+    if (w->returnType == 'i')
+        napi_create_int32(env, w->i32Result, &result);
+    else if (w->returnType == 'l')
+        napi_create_int64(env, w->i64Result, &result);
+    else
+        napi_create_double(env, w->dblResult, &result);
+    napi_resolve_deferred(env, w->deferred, result);
+    for (int i = 0; i < w->ns; i++) delete[] w->strBuf[i];
+    delete w;
+}
+
+static napi_value CallAsync(napi_env env, napi_callback_info info)
+{
+    size_t argc = 6;
+    napi_value args[6] = {nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    bool lossless = false;
+    uint64_t handleValue = 0;
+    napi_get_value_bigint_uint64(env, args[0], &handleValue, &lossless);
+
+    size_t fnSize = 0;
+    napi_get_value_string_utf8(env, args[1], nullptr, 0, &fnSize);
+    char* funcName = new char[fnSize + 1];
+    napi_get_value_string_utf8(env, args[1], funcName, fnSize + 1, &fnSize);
+
+    size_t typeSize = 0;
+    napi_get_value_string_utf8(env, args[2], nullptr, 0, &typeSize);
+    char* argTypes = new char[typeSize + 1];
+    napi_get_value_string_utf8(env, args[2], argTypes, typeSize + 1, &typeSize);
+
+    size_t retSize = 0;
+    napi_get_value_string_utf8(env, args[3], nullptr, 0, &retSize);
+    char* retType = new char[retSize + 1];
+    napi_get_value_string_utf8(env, args[3], retType, retSize + 1, &retSize);
+
+    std::pair<uint64_t, std::string> key(handleValue, funcName);
+    auto it = g_registry.find(key);
+    if (it == g_registry.end()) {
+        std::string msg = "Function '";
+        msg += funcName;
+        msg += "' not defined. Call defineFunction first.";
+        napi_throw_error(env, nullptr, msg.c_str());
+        delete[] funcName; delete[] argTypes; delete[] retType;
+        napi_value result;
+        napi_get_undefined(env, &result);
+        return result;
+    }
+
+    delete[] funcName;
+
+    auto* w = new AsyncWorkData();
+    w->funcPtr = it->second.funcPtr;
+    w->sig = argTypes;
+    w->returnType = retType[0];
+    w->ns = 0;
+
+    for (size_t k = 0; k < w->sig.size(); k++) {
+        if (w->sig[k] == 'l' || w->sig[k] == 'b' || w->sig[k] == 'c' || w->sig[k] == 'p') {
+            w->sig[k] = 'i';
+        } else if (w->sig[k] == 'f') {
+            w->sig[k] = 'd';
+        }
+    }
+
+    memset(w->intBuf, 0, sizeof(w->intBuf));
+    memset(w->int64Buf, 0, sizeof(w->int64Buf));
+    memset(w->dblBuf, 0, sizeof(w->dblBuf));
+    memset(w->strBuf, 0, sizeof(w->strBuf));
+
+    uint32_t numLen = 0, strLen = 0;
+    napi_get_array_length(env, args[4], &numLen);
+    napi_get_array_length(env, args[5], &strLen);
+
+    int numIdx = 0, strIdx = 0;
+    int ni = 0, n64 = 0, nd = 0, ns = 0;
+    for (size_t k = 0; k < w->sig.size(); k++) {
+        napi_value e;
+        if (w->sig[k] == 'i' || w->sig[k] == 'l' || w->sig[k] == 'b' || w->sig[k] == 'c' || w->sig[k] == 'p' || w->sig[k] == 'k') {
+            napi_get_element(env, args[4], numIdx, &e);
+            int64_t val;
+            napi_get_value_int64(env, e, &val);
+            if (w->sig[k] == 'l' || w->sig[k] == 'p' || w->sig[k] == 'k') {
+                w->int64Buf[n64] = val;
+                n64++;
+            } else {
+                w->intBuf[ni] = static_cast<int32_t>(val);
+                ni++;
+            }
+            numIdx++;
+        } else if (w->sig[k] == 'd' || w->sig[k] == 'f') {
+            napi_get_element(env, args[4], numIdx, &e);
+            napi_get_value_double(env, e, &w->dblBuf[nd]);
+            nd++;
+            numIdx++;
+        } else if (w->sig[k] == 's') {
+            size_t sl = 0;
+            napi_get_element(env, args[5], strIdx, &e);
+            napi_get_value_string_utf8(env, e, nullptr, 0, &sl);
+            w->strBuf[ns] = new char[sl + 1];
+            napi_get_value_string_utf8(env, e, w->strBuf[ns], sl + 1, &sl);
+            ns++;
+            strIdx++;
+        }
+    }
+    w->ns = ns;
+
+    napi_value resourceName;
+    napi_create_string_utf8(env, "CallAsync", NAPI_AUTO_LENGTH, &resourceName);
+
+    napi_value promise;
+    napi_create_promise(env, &w->deferred, &promise);
+
+    napi_async_work work;
+    napi_create_async_work(env, nullptr, resourceName,
+        AsyncExecuteCB, AsyncCompleteCB, w, &work);
+    napi_queue_async_work(env, work);
+
+    delete[] argTypes;
+    delete[] retType;
+
+    return promise;
+}
+
 static napi_value PtrFromTypedArray(napi_env env, napi_callback_info info)
 {
     size_t argc = 1;
@@ -775,6 +1023,28 @@ static napi_value PtrFromTypedArray(napi_env env, napi_callback_info info)
     napi_value result;
     napi_create_double(env, static_cast<double>(ptrValue), &result);
     return result;
+}
+
+static napi_value ReadMemory(napi_env env, napi_callback_info info)
+{
+    size_t argc = 2;
+    napi_value args[2] = {nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    int64_t ptrValue = 0;
+    napi_get_value_int64(env, args[0], &ptrValue);
+
+    int32_t byteLength = 0;
+    napi_get_value_int32(env, args[1], &byteLength);
+
+    void* src = reinterpret_cast<void*>(ptrValue);
+
+    napi_value buffer;
+    void* data = nullptr;
+    napi_create_arraybuffer(env, byteLength, &data, &buffer);
+    memcpy(data, src, byteLength);
+
+    return buffer;
 }
 
 static napi_value GetCallbackPtr(napi_env env, napi_callback_info info)
@@ -862,7 +1132,9 @@ static napi_value Init(napi_env env, napi_value exports)
         {"getCallbackThreadsafe", nullptr, GetCallbackThreadsafe, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getCallbackPtr", nullptr, GetCallbackPtr, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"ptr", nullptr, PtrFromTypedArray, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"readMemory", nullptr, ReadMemory, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"callCallbackThreadSafe", nullptr, CallCallbackThreadSafe, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"callAsync", nullptr, CallAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;
