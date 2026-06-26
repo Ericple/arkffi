@@ -32,8 +32,3 @@ jobs:
         run: |
           cd /workspace
           hvigorw assembleHar --mode module -p module=library -p buildMode=debug
-
-      - name: Build HAP
-        run: |
-          cd /workspace
-          hvigorw assembleHap --mode module -p module=entry -p buildMode=debug
