@@ -1,10 +1,17 @@
 {
   "name": "arkffi",
-  "version": "1.0.0",
-  "description": "Please describe the basic information.",
+  "version": "0.1.0",
+  "description": "arkffi 让你从 ArkTS 直接调用 .so 共享库中的 C 函数 —— 无需手写 NAPI 绑定。",
+  "keywords": [
+    "ffi",
+    "C",
+    "Cplusplus",
+    "arkts"
+  ],
   "main": "Index.ets",
-  "author": "",
+  "author": "Guo Tingjin",
   "license": "Apache-2.0",
+  "homepage": "https://docs.arkffi.hmbill.cn/zh",
   "dependencies": {
     "liblibrary.so": "file:./src/main/cpp/types/liblibrary"
   }
