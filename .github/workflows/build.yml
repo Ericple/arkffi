@@ -12,21 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get HarmonyOS CLI download URL
-        id: get_url
+      - name: Download HarmonyOS CLI
         run: |
-          RESPONSE=$(curl -s -X POST \
-            "https://svc-drcn.developer.huawei.com/svc/community/common/v1/delegate" \
-            -H "Content-Type: application/json" \
-            -d '{"svc":"PartnerCommunityService/v1/developer/downloadCenter/getToolVersionDownloadUrl","reqType":1,"reqJson":"{\"sdkId\":\"bd3d76780d0a49de8dd117a6264fc38f\",\"versionId\":\"231781243327867001\",\"packageId\":\"231781243327873004\"}"}')
-
-          URL=$(echo "$RESPONSE" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(json.loads(d["resJson"])["adUrl"])')
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-
-      - name: Download and extract CLI
-        run: |
-          URL="${{ steps.get_url.outputs.url }}"
-          curl -L -o ohos_cli.zip "$URL"
+          curl -L -o ohos_cli.zip \
+            "https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/0d/v3/s85Ain1uQrWv2NwXJq0Iqg/commandline-tools-linux-x64-26.0.0.461.zip?HW-CC-KV=V1&HW-CC-Date=20260626T004742Z&HW-CC-Expire=315360000&HW-CC-Sign=6A4020EB4E3D0EADB0A417D27EA35FAAA1967A5AB6F8022292A77194305C71C"
           mkdir -p "$HOME/ohos-sdk"
           unzip -q ohos_cli.zip -d "$HOME/ohos-sdk"
 
@@ -40,7 +29,6 @@ jobs:
             chmod +x "$SDK_MANAGER"
             echo "DEVECO_SDK_HOME=$HOME/ohos-sdk" >> "$GITHUB_ENV"
           fi
-          echo "SDK_MANAGER=$SDK_MANAGER"
 
       - uses: actions/setup-node@v4
         with:
