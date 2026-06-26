@@ -2,14 +2,14 @@ name: Build
 
 on:
   push:
-    branches: [ nightly ]
-    paths-ignore: [ docs/** ]
+    branches: [nightly]
+    paths-ignore: [docs/**]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: peercat/hos-compile-env
+      image: peercat/hos-compile-env-linux-amd64
 
     steps:
       - name: Clone repository
@@ -18,19 +18,10 @@ jobs:
           cd /workspace
           git checkout "${{ github.ref_name }}"
 
-      - name: Locate SDK
+      - name: Set up SDK environment
         run: |
-          # Debug: find SDK components
-          echo "=== Looking for SDK ==="
-          find / -maxdepth 5 -name "ets" -type d 2>/dev/null | head -5
-          find / -maxdepth 5 -name "sdkmanager" -type f 2>/dev/null | head -5
-          find / -maxdepth 5 -name "native" -type d 2>/dev/null | head -5
-          echo "=== which hvigorw ==="
-          which hvigorw 2>/dev/null || echo "not found"
-          echo "=== env ==="
-          env | grep -i sdk
-          env | grep -i OHOS
-          env | grep -i DEVECO
+          echo "DEVECO_SDK_HOME=${COMMANDLINE_TOOL_DIR}/sdk" >> "$GITHUB_ENV"
+          echo "OHOS_SDK_HOME=${COMMANDLINE_TOOL_DIR}/sdk" >> "$GITHUB_ENV"
 
       - name: Build HAR
         run: |
