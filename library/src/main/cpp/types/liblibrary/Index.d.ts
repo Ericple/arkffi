@@ -31,4 +31,4 @@ export const getCallbackPtr: (handle: number) => number;
 
 export const callCallbackThreadSafe: (handle: number, arg: number) => void;
 
-export const ptr: (buffer: ArrayBuffer | TypedArray) => number;
+export const ptr: (buffer: ArrayBuffer | ArrayBufferView) => number;
