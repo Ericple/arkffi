@@ -2,14 +2,14 @@ name: Build
 
 on:
   push:
-    branches: [nightly]
-    paths-ignore: [docs/**]
+    branches: [ nightly ]
+    paths-ignore: [ docs/** ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: peercat/hos-compile-env-linux-amd64
+      image: peercat/hos-compile-env-linux-amd64:latest
 
     steps:
       - name: Clone repository
