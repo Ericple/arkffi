@@ -1,6 +1,14 @@
 # arkffi
 
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Ericple/arkffi/build.yml?branch=nightly&style=flat-square)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/Ericple/arkffi?style=flat-square)
+![GitHub contributors](https://img.shields.io/github/contributors/Ericple/arkffi?style=flat-square)
+![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/Ericple/arkffi?style=flat-square)
+![GitHub License](https://img.shields.io/github/license/Ericple/arkffi?style=flat-square)
+
 arkffi 是一个 HarmonyOS / ArkTS 的外部函数接口（FFI）库，支持从 ArkTS 直接调用 `.so` 共享库中的 C 函数。
+
+[点此](https://docs.arkffi.hmbill.cn/)查看文档以快速开始！
 
 ## 特性
 
@@ -19,14 +27,14 @@ arkffi 是一个 HarmonyOS / ArkTS 的外部函数接口（FFI）库，支持从
 import { dlopen, FFIType, CString } from 'library';
 
 const lib = dlopen('libffi_target.so', {
-  add:        { args: [FFIType.double, FFIType.double], returns: FFIType.double },
-  getVersion: { args: [],                                returns: FFIType.int64 },
+  add: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+  getVersion: { args: [], returns: FFIType.int64 },
 });
 
-lib.symbols.add(2.0, 3.0);                           // → 5.0
+lib.symbols.add(2.0, 3.0); // → 5.0
 
 const ptr = lib.symbols.getVersion();
-new CString(ptr).toString();                         // → "1.0.0"
+new CString(ptr).toString(); // → "1.0.0"
 
 lib.close();
 ```
@@ -66,16 +74,16 @@ ohpm install arkffi
 
 ## API 一览
 
-| API | 说明 |
-|-----|------|
-| `dlopen(path, defs)` | 加载共享库，返回带类型化符号的 `Library` |
-| `Library.symbols.fn()` | 调用原生函数 |
-| `Library.close()` | 释放库句柄 |
-| `FFIType.*` | C 类型常量（int32 / int64 / double / float / CString 等） |
-| `CString(ptr)` | 从原始指针读取 C 字符串 |
-| `CFunction({args, returns, ptr})` | 包装 C 函数指针为可调用函数 |
-| `JSCallback(fn, def)` | 包装 JS 函数为 C 回调 |
-| `ffi.load / close / callMixed / callBySig` | 原始 NAPI 桥接 |
+| API                                        | 说明                                                 |
+|--------------------------------------------|----------------------------------------------------|
+| `dlopen(path, defs)`                       | 加载共享库，返回带类型化符号的 `Library`                          |
+| `Library.symbols.fn()`                     | 调用原生函数                                             |
+| `Library.close()`                          | 释放库句柄                                              |
+| `FFIType.*`                                | C 类型常量（int32 / int64 / double / float / CString 等） |
+| `CString(ptr)`                             | 从原始指针读取 C 字符串                                      |
+| `CFunction({args, returns, ptr})`          | 包装 C 函数指针为可调用函数                                    |
+| `JSCallback(fn, def)`                      | 包装 JS 函数为 C 回调                                     |
+| `ffi.load / close / callMixed / callBySig` | 原始 NAPI 桥接                                         |
 
 ## 文档
 
