@@ -10,6 +10,14 @@ description: "Install arkffi and call your first C function"
     - HarmonyOS (API 12+) device or emulator
     - DevEco Studio with HarmonyOS SDK
     - A `.so` shared library (pre-built or compiled from source)
+
+    **Architecture support:**
+
+    | Architecture | ABI | Notes |
+    |---|---|---|
+    | ARM64 | `arm64-v8a` | Default, verified |
+    | x86_64 | `x86_64` | Add `x86_64` to `abiFilters` |
+    | RISC-V 64 | `riscv64` | External toolchain; DevEco Studio does not support RISC-V build natively |
   </Step>
 
   <Step title="Install arkffi">

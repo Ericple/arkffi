@@ -40,10 +40,41 @@ lib.close();
 
 ```typescript
 interface FFIFunction {
-  args: string[];        // 参数类型编码
-  returns: string;       // 返回类型编码
-  threadsafe?: boolean;  // 用于 JSCallback 定义
+  args: (string | StructSchema)[];  // 参数类型编码，支持 StructSchema
+  returns: string | StructSchema;   // 返回类型编码，支持 StructSchema
+  threadsafe?: boolean;             // 用于 JSCallback 定义
 }
+```
+
+## 结构体类型支持
+
+`args` 和 `returns` 除了接受 `FFIType.*` 字符串，还可传入 `StructSchema` 实例，用于在寄存器中传递的小型 HFA 结构体。
+
+```typescript
+const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
+
+const lib = dlopen('libfft.so', {
+  complex_add: {
+    args: [Complex, Complex],   // 展开为 4 个 double
+    returns: Complex,           // 编码为返回 buffer ← 返回指针
+  },
+});
+
+let a = Complex.create({ real: 1, imag: 2 });
+let b = Complex.create({ real: 3, imag: 4 });
+let ptr: number = lib.symbols.complex_add(a, b);
+let result = Complex.fromPtr(ptr);
+console.log(result.real, result.imag); // 4, 6
+```
+
+内部流程：
+
+```
+defineFunction(handle, 'complex_add', 'dddd', '2')
+                           ↑ StructSchema 展开为字段类型
+调用时：
+  ArrayBuffer → 解包为 [1, 2, 3, 4] → NAPI
+  NAPI 返回 buffer → ffi.ptr(buf) → 指针返回给用户
 ```
 
 ## 类型推断

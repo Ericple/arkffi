@@ -3,7 +3,7 @@ title: "dlopen"
 description: "加載共享庫並獲取類型化函數定義"
 ---
 
-`dlopen` 加載共享庫並返回帶類型化符號的 [`Library`](/zh/api/library) 實例。
+`dlopen` 加載共享庫並返回帶類型化符號的 [`Library`](/zh-Hant/api/library) 實例。
 
 ## 語法
 
@@ -40,10 +40,41 @@ lib.close();
 
 ```typescript
 interface FFIFunction {
-  args: string[];        // 參數類型編碼
-  returns: string;       // 返回類型編碼
-  threadsafe?: boolean;  // 用於 JSCallback 定義
+  args: (string | StructSchema)[];  // 參數類型編碼，支持 StructSchema
+  returns: string | StructSchema;   // 返回類型編碼，支持 StructSchema
+  threadsafe?: boolean;             // 用於 JSCallback 定義
 }
+```
+
+## 結構體類型支持
+
+`args` 和 `returns` 除了接受 `FFIType.*` 字符串，還可傳入 `StructSchema` 實例，用於在寄存器中傳遞的小型 HFA 結構體。
+
+```typescript
+const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
+
+const lib = dlopen('libfft.so', {
+  complex_add: {
+    args: [Complex, Complex],   // 展開為 4 個 double
+    returns: Complex,           // 編碼為返回 buffer ← 返回指針
+  },
+});
+
+let a = Complex.create({ real: 1, imag: 2 });
+let b = Complex.create({ real: 3, imag: 4 });
+let ptr: number = lib.symbols.complex_add(a, b);
+let result = Complex.fromPtr(ptr);
+console.log(result.real, result.imag); // 4, 6
+```
+
+內部流程：
+
+```
+defineFunction(handle, 'complex_add', 'dddd', '2')
+                           ↑ StructSchema 展開為字段類型
+調用時：
+  ArrayBuffer → 解包為 [1, 2, 3, 4] → NAPI
+  NAPI 返回 buffer → ffi.ptr(buf) → 指針返回給用戶
 ```
 
 ## 類型推斷
@@ -51,8 +82,6 @@ interface FFIFunction {
 `dlopen` 使用 TypeScript 泛型推斷 `symbols` 的結構，爲所有定義的函數名提供 IDE 自動補全。
 
 ```typescript
-import { dlopen, FFIType } from 'arkffi';
-
 const lib = dlopen('lib.so', {
   myFunc: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
 });
@@ -61,4 +90,4 @@ lib.symbols.myFunc(2.0, 3.0); // 自動補全
 
 ## 返回值
 
-返回 [`Library`](/zh/api/library) 實例。
+返回 [`Library`](/zh-Hant/api/library) 實例。

@@ -10,6 +10,14 @@ description: "安裝 arkffi 並調用你的第一個 C 函數"
     - HarmonyOS（API 12+）設備或模擬器
     - DevEco Studio 和 HarmonyOS SDK
     - 一個 `.so` 共享庫（預編譯或從源碼編譯）
+
+    **架構支援：**
+
+    | 架構 | ABI | 說明 |
+    |---|---|---|
+    | ARM64 | `arm64-v8a` | 預設支援，已驗證 |
+    | x86_64 | `x86_64` | 需在 `abiFilters` 中新增 |
+    | RISC-V 64 | `riscv64` | 需外部工具鏈；DevEco Studio 不直接支援 RISC-V 構建 |
   </Step>
 
   <Step title="添加 library 模塊">
@@ -32,7 +40,7 @@ description: "安裝 arkffi 並調用你的第一個 C 函數"
       "buildOption": {
         "externalNativeOptions": {
           "path": "./src/main/cpp/CMakeLists.txt",
-          "abiFilters": ["arm64-v8a", "x86_64"]
+          "abiFilters": ["arm64-v8a", "x86_64", "riscv64"]
         }
       }
     }

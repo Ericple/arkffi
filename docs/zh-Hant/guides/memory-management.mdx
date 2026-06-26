@@ -1,0 +1,107 @@
+---
+title: "記憶體管理"
+description: "了解 ArkFFI 中各類型參數的生命週期和記憶體規則"
+---
+
+ArkFFI 在 TypeScript 層管理部分記憶體，但大多數情況下 C 庫的記憶體由 C 庫自身管理。理解各場景的記憶體歸屬，可避免泄漏和野指針。
+
+## 概覽
+
+| 場景 | 誰分配 | 誰釋放 | 安全使用方式 |
+|---|---|---|---|
+| 基本類型傳參（int、double） | — | — | 值傳遞，無分配 |
+| 字串傳參（`FFIType.CString`） | NAPI 層 | NAPI 層（呼叫後立即釋放） | 無需操心 |
+| 字串回傳值（`callString`） | C 庫 | C 庫 | 唯讀，不釋放 |
+| `const char*` 結構體欄位 | C 庫 | C 庫 | `fromPtr` 讀取指針值，不釋放 |
+| 結構體傳參（`StructSchema`） | 使用者（`create`） | 使用者自行管理 | `create` 回傳的 `ArrayBuffer` 用完後釋放 |
+| 結構體回傳值（`StructSchema`） | ArkFFI（內部 `ArrayBuffer`） | 使用者呼叫 `releasePtr` | 讀取後呼叫 `releasePtr`，否則 Map 常駐 |
+| `getSymbolPtr` / `ffi.ptr` | — | — | 僅獲取位址，無分配 |
+
+## 基本類型傳參
+
+`int`、`double`、`char` 等基本類型透過暫存器或堆疊傳遞，不涉及任何記憶體分配。直接傳入即可。
+
+```typescript
+lib.symbols.add(2.0, 3.0); // 無分配，值傳遞
+```
+
+## 字串傳參
+
+當參數類型為 `FFIType.CString` 時，NAPI 層會用 `napi_get_value_string_utf8` 取得 C 字串，在堆上分配 `char*`，呼叫 C 函數後立即 `delete[]`。使用者無需管理。
+
+```typescript
+lib.symbols.compute(0, 4.0, 'square');
+// ↑ NAPI 內部：allocate char* → call → delete[]
+```
+
+## 字串回傳值
+
+`callString` 回傳 C 庫內部持有的 `const char*`，ArkFFI 只讀取其內容（`napi_create_string_utf8`），不分配也不釋放。指針的生命週期由 C 庫管理。
+
+結構體 `fromPtr` 中 `const char*` 欄位同樣回傳指針數值，該指針指向 C 庫記憶體，**不要透過 `releasePtr` 釋放**。
+
+```typescript
+let ptr = result.name; // const char* 指針，指向 C 庫
+let name = new CString(ptr).toString(); // 唯讀
+// 不要 releasePtr(ptr) ← 非 ArkFFI 管理
+```
+
+## 結構體傳參
+
+透過 `StructSchema.create()` 建立的 `ArrayBuffer` 由使用者分配，傳遞給 C 函數後由使用者自行管理其生命週期。
+
+```typescript
+let buf = Complex.create({ real: 1, imag: 2 });
+lib.symbols.complex_add(buf, otherBuf);
+// buf 由使用者管理，用完後賦值 null 即可 GC
+```
+
+## 結構體回傳值（`releasePtr`）
+
+當 `dlopen` / `CFunction` 的 `returns` 為 `StructSchema` 時，ArkFFI 內部會：
+1. 呼叫 NAPI 取得 `ArrayBuffer`
+2. 透過 `ffi.ptr` 取得其資料指針
+3. 將 `ArrayBuffer` 存入 `g_structResults` Map 防止 GC
+4. 回傳指針給使用者
+
+使用者透過 `fromPtr` 讀取後，應呼叫 `releasePtr` 釋放 Map 中的參照，使 `ArrayBuffer` 可被 GC。
+
+```typescript
+import { releasePtr } from 'arkffi';
+
+let ptr = lib.symbols.complex_add(a, b);   // ArkFFI 內部分配 buffer
+let result = Complex.fromPtr(ptr);          // 讀取資料
+releasePtr(ptr);                            // 釋放參照（允許 GC）
+```
+
+### 不呼叫 releasePtr 會怎樣？
+
+`g_structResults` Map 持續持有 `ArrayBuffer` 的參照，指針始終有效。Map 條目在呼叫 `releasePtr` 或程式退出前不會被 GC，但一般不構成問題（條目數等於 struct 回傳呼叫次數）。
+
+### 釋放錯誤指針會怎樣？
+
+`releasePtr(ptr)` 在 Map 中按 key 查找。如果 `ptr` 不是由 ArkFFI struct 回傳分配的指針（例如來自 C 庫的 `const char*`），Map 找不到該 key，**靜默無操作**，不會崩潰。
+
+## 指針類型（ptr、callback）
+
+`FFIType.ptr` 和 `FFIType.callback` 傳達的是位址值（`number`），不涉及記憶體分配。位址由 C 庫管理或由 `JSCallback` 內部槽位管理。
+
+```typescript
+let applyPtr = ffi.getSymbolPtr(handle, 'apply_callback');
+// 只獲取位址，無分配
+
+JSCallback 的 ptr 指向內部槽位或 trampoline，由 JSCallback 自己管理。
+close() 時釋放槽位。
+```
+
+## 核心原則
+
+> **ArkFFI 只管理自己分配的記憶體。C 庫的記憶體由 C 庫管理。**
+
+| 記憶體來源 | 管理方 |
+|---|---|
+| `napi_get_value_string_utf8` 副本 | ArkFFI（自動釋放） |
+| struct 回傳值內部 `ArrayBuffer` | ArkFFI（`releasePtr` 釋放） |
+| C 庫回傳的 `const char*` | C 庫 |
+| 使用者 `StructSchema.create()` 產物 | 使用者 |
+| `dlopen` 內部 handle | ArkFFI（`close()` 時 `dlclose`） |

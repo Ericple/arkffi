@@ -12,6 +12,7 @@
   "author": "Guo Tingjin",
   "license": "Apache-2.0",
   "homepage": "https://docs.arkffi.hmbill.cn/zh",
+  "repository": "https://github.com/Ericple/arkffi",
   "dependencies": {
     "liblibrary.so": "file:./src/main/cpp/types/liblibrary"
   }

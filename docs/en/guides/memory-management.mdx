@@ -1,0 +1,107 @@
+---
+title: "Memory Management"
+description: "Understand memory ownership and lifecycle rules in ArkFFI"
+---
+
+ArkFFI manages some memory at the TypeScript layer, but most C library memory is owned by the library itself. Understanding ownership for each scenario prevents leaks and dangling pointers.
+
+## Overview
+
+| Scenario | Allocator | Deallocator | Safe Usage |
+|---|---|---|---|
+| Primitive args (int, double) | — | — | Pass by value, no allocation |
+| String args (`FFIType.CString`) | NAPI layer | NAPI layer (freed after call) | No action needed |
+| String return value (`callString`) | C library | C library | Read only, do not free |
+| `const char*` struct field | C library | C library | `fromPtr` reads pointer, do not free |
+| Struct arg (`StructSchema`) | User (`create`) | User | Free `ArrayBuffer` when done |
+| Struct return (`StructSchema`) | ArkFFI (internal `ArrayBuffer`) | User calls `releasePtr` | Call `releasePtr` after reading |
+| `getSymbolPtr` / `ffi.ptr` | — | — | Address only, no allocation |
+
+## Primitive Args
+
+`int`, `double`, `char`, etc. are passed by value via registers or stack — no allocation involved.
+
+```typescript
+lib.symbols.add(2.0, 3.0); // value only, no allocation
+```
+
+## String Args
+
+When a parameter type is `FFIType.CString`, the NAPI bridge calls `napi_get_value_string_utf8` to get the C string, allocates a `char*` on the heap, calls the C function, and immediately `delete[]` it. No user action needed.
+
+```typescript
+lib.symbols.compute(0, 4.0, 'square');
+// ↑ NAPI: allocate char* → call → delete[]
+```
+
+## String Return Values
+
+`callString` returns a `const char*` owned by the C library. ArkFFI only reads its content via `napi_create_string_utf8` — it does not allocate or free. The pointer lifecycle is managed by the C library.
+
+Similarly, `const char*` fields from `fromPtr` return a pointer value pointing into C library memory. **Do not pass it to `releasePtr`**.
+
+```typescript
+let ptr = result.name; // const char*, points to C library memory
+let name = new CString(ptr).toString(); // read only
+// Do NOT releasePtr(ptr) — not managed by ArkFFI
+```
+
+## Struct Args
+
+`ArrayBuffer` created by `StructSchema.create()` is allocated by the user. After passing it to a C function, the user owns its lifecycle.
+
+```typescript
+let buf = Complex.create({ real: 1, imag: 2 });
+lib.symbols.complex_add(buf, otherBuf);
+// buf owned by user — assign null when done to allow GC
+```
+
+## Struct Returns (`releasePtr`)
+
+When `dlopen` / `CFunction` has a `StructSchema` as `returns`, ArkFFI:
+1. Calls NAPI to obtain an `ArrayBuffer`
+2. Gets its data pointer via `ffi.ptr`
+3. Stores the `ArrayBuffer` in an internal `Map` to prevent GC
+4. Returns the pointer to the user
+
+After reading with `fromPtr`, call `releasePtr` to remove the Map reference and allow GC.
+
+```typescript
+import { releasePtr } from 'arkffi';
+
+let ptr = lib.symbols.complex_add(a, b);   // ArkFFI allocates buffer internally
+let result = Complex.fromPtr(ptr);          // read data
+releasePtr(ptr);                            // release reference (allow GC)
+```
+
+### What if I forget to call releasePtr?
+
+The internal `Map` holds the `ArrayBuffer` reference indefinitely. The pointer remains valid. The entry is only removed by `releasePtr` or program exit. This is generally harmless — entries grow linearly with struct return calls.
+
+### What if I pass the wrong pointer to releasePtr?
+
+`releasePtr(ptr)` does a Map lookup by key. If `ptr` was not allocated by an ArkFFI struct return (e.g., a C library `const char*`), the key is not found and the call is **silently ignored** — no crash.
+
+## Pointer Types (ptr, callback)
+
+`FFIType.ptr` and `FFIType.callback` pass address values (`number`) — no allocation. The address is managed by the C library or by `JSCallback`'s internal slot system.
+
+```typescript
+let applyPtr = ffi.getSymbolPtr(handle, 'apply_callback');
+// address only, no allocation
+
+JSCallback.ptr points to an internal slot or trampoline managed by JSCallback.
+close() releases the slot.
+```
+
+## Core Principle
+
+> **ArkFFI only manages memory it allocates. C library memory is managed by the C library.**
+
+| Memory Source | Manager |
+|---|---|
+| `napi_get_value_string_utf8` copy | ArkFFI (auto free) |
+| Struct return internal `ArrayBuffer` | ArkFFI (`releasePtr` to free) |
+| C library `const char*` | C library |
+| User `StructSchema.create()` result | User |
+| `dlopen` internal handle | ArkFFI (`close()` calls `dlclose`) |

@@ -40,10 +40,41 @@ lib.close();
 
 ```typescript
 interface FFIFunction {
-  args: string[];        // Parameter type codes
-  returns: string;       // Return type code
-  threadsafe?: boolean;  // For JSCallback definitions
+  args: (string | StructSchema)[];  // Parameter type codes, supports StructSchema
+  returns: string | StructSchema;   // Return type code, supports StructSchema
+  threadsafe?: boolean;             // For JSCallback definitions
 }
+```
+
+## Struct Type Support
+
+`args` and `returns` accept `StructSchema` instances for small HFA structs passed in registers.
+
+```typescript
+const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
+
+const lib = dlopen('libfft.so', {
+  complex_add: {
+    args: [Complex, Complex],   // expands to 4 doubles
+    returns: Complex,            // encodes as '2' → returns buffer pointer
+  },
+});
+
+let a = Complex.create({ real: 1, imag: 2 });
+let b = Complex.create({ real: 3, imag: 4 });
+let ptr: number = lib.symbols.complex_add(a, b);
+let result = Complex.fromPtr(ptr);
+console.log(result.real, result.imag); // 4, 6
+```
+
+Internally:
+
+```
+defineFunction(handle, 'complex_add', 'dddd', '2')
+                           ↑ StructSchema expanded to field types
+At call time:
+  ArrayBuffer → unpacked as [1, 2, 3, 4] → NAPI
+  NAPI returns buffer → ffi.ptr(buf) → pointer returned to user
 ```
 
 ## Type Inference

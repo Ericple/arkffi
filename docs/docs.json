@@ -42,7 +42,8 @@
               "zh/guides/callbacks",
               "zh/guides/async-call",
               "zh/guides/external-library",
-              "zh/guides/comparison-with-aki"
+              "zh/guides/comparison-with-aki",
+              "zh/guides/memory-management"
             ]
           },
           {
@@ -84,7 +85,8 @@
               "zh-Hant/guides/callbacks",
               "zh-Hant/guides/async-call",
               "zh-Hant/guides/external-library",
-              "zh-Hant/guides/comparison-with-aki"
+              "zh-Hant/guides/comparison-with-aki",
+              "zh-Hant/guides/memory-management"
             ]
           },
           {
@@ -126,7 +128,8 @@
               "en/guides/callbacks",
               "en/guides/async-call",
               "en/guides/external-library",
-              "en/guides/comparison-with-aki"
+              "en/guides/comparison-with-aki",
+              "en/guides/memory-management"
             ]
           },
           {

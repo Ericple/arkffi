@@ -753,5 +753,6 @@ export default function ffiTest() {
       expect(view.getFloat64(8, true)).assertEqual(6.0);
       ffi.close(handle);
     })
+
   })
 }

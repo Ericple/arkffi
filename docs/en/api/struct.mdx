@@ -16,7 +16,7 @@ const Point = Struct({
 });
 
 const buf = Point.create({ x: 10, y: 20 });
-const ptr = ffi.ptr(buf); // pass to C function
+const ptr = ffi.ptr(buf);
 
 const read = Point.fromPtr(somePtr);
 console.log(read.x, read.y);
@@ -25,12 +25,12 @@ console.log(read.x, read.y);
 ## Struct()
 
 ```typescript
-function Struct(fields: Record<string, string>): StructSchema;
+function Struct(fields: Record<string, string | StructSchema>): StructSchema;
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
-| `fields` | `Record<string, string>` | Field name to type code mapping |
+| `fields` | `Record<string, string \| StructSchema>` | Field name to type code mapping, supports nesting |
 
 ## StructSchema
 
@@ -45,10 +45,10 @@ Total size of the struct in bytes, including padding.
 ### `create()`
 
 ```typescript
-create(obj: Record<string, number | bigint>): ArrayBuffer;
+create(obj: Record<string, number | bigint | ArrayBuffer>): ArrayBuffer;
 ```
 
-Serialize an object to an ArrayBuffer.
+Serialize an object to an ArrayBuffer. Nested struct fields accept the ArrayBuffer from their own `create()`.
 
 ### `fromPtr()`
 
@@ -56,23 +56,61 @@ Serialize an object to an ArrayBuffer.
 fromPtr(ptr: number, byteOffset?: number): Record<string, number>;
 ```
 
-Read struct data from a raw pointer and deserialize.
+Read struct data from a raw pointer. **Primitive fields return numbers; nested struct fields return a pointer** (the absolute address of the sub-struct). Use the inner schema's `fromPtr` to read further.
 
-### `get()`
+### `get()` / `set()`
 
 ```typescript
 get(buf: ArrayBuffer, field: string): number;
-```
-
-Read a single field from an ArrayBuffer.
-
-### `set()`
-
-```typescript
 set(buf: ArrayBuffer, field: string, value: number): void;
 ```
 
-Set a single field in an ArrayBuffer.
+Only supported for primitive fields. Nested struct fields return `0` / no-op.
+
+## Nested Structs
+
+Field values can be another `StructSchema` for recursive layout computation.
+
+```typescript
+// C: struct Inner { double x, y; };
+// C: struct Outer { struct Inner pos; const char* name; };
+const Inner = Struct({
+  x: FFIType.double,
+  y: FFIType.double,
+});
+const Outer = Struct({
+  pos: Inner,
+  name: FFIType.ptr,
+});
+
+let buf = Outer.create({
+  pos: Inner.create({ x: 1.0, y: 2.0 }),
+  name: 0x1234,
+});
+
+let r = Outer.fromPtr(ptr);
+let innerR = Inner.fromPtr(r.pos);
+console.log(innerR.x, innerR.y); // 1.0, 2.0
+```
+
+## With `dlopen` (HFA register passing)
+
+For small HFA structs passed in registers, pass `StructSchema` directly as `args` / `returns` to `dlopen`:
+
+```typescript
+// C: complex_t complex_add(complex_t a, complex_t b);
+const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
+const lib = dlopen(LIB_NAME, {
+  complex_add: { args: [Complex, Complex], returns: Complex },
+});
+
+let a = Complex.create({ real: 1, imag: 2 });
+let b = Complex.create({ real: 3, imag: 4 });
+let ptr: number = lib.symbols.complex_add(a, b);
+let result = Complex.fromPtr(ptr); // { real: 4, imag: 6 }
+```
+
+Struct args are expanded to their field values for register passing. Struct returns allocate a buffer and return its pointer. Read the result synchronously via `fromPtr`.
 
 ## ARM64 Alignment Rules
 
@@ -87,6 +125,8 @@ Set a single field in an ArrayBuffer.
 | `s` | `const char*` (pointer) | 8 | 8 |
 | `p` / `k` | `void*` / function pointer | 8 | 8 |
 
+Nested struct alignment is the maximum alignment of all its fields.
+
 ```typescript
 const Mixed = Struct({ a: 'c', b: 'i', c: 'c' });
 // a at offset 0 (1 byte), b at offset 4 (3 pad), c at offset 8 (1 byte)
@@ -96,6 +136,8 @@ const Mixed = Struct({ a: 'c', b: 'i', c: 'c' });
 ## Working with C Functions
 
 ```typescript
+// C: void setPoint(struct Point* p, int x, int y)
+
 const Point = Struct({ x: 'i', y: 'i' });
 const lib = dlopen('lib.so', {
   setPoint: { args: [FFIType.ptr, FFIType.int32, FFIType.int32], returns: 'i' },
@@ -105,5 +147,5 @@ const buf = Point.create({ x: 0, y: 0 });
 lib.symbols.setPoint(ffi.ptr(buf), 42, 99);
 
 const result = Point.fromPtr(ffi.ptr(buf));
-console.log(result.x, result.y); // 42, 99
+console.log(result.x, result.y);
 ```

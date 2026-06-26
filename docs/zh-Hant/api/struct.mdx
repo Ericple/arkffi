@@ -10,17 +10,14 @@ description: "在 ArkTS 中定義和操作 C 結構體"
 ```typescript
 import { Struct, FFIType, ffi } from 'arkffi';
 
-// 定義結構體
 const Point = Struct({
   x: FFIType.int32,
   y: FFIType.int32,
 });
 
-// 創建實例
 const buf = Point.create({ x: 10, y: 20 });
-const ptr = ffi.ptr(buf); // 獲取指針，傳給 C 函數
+const ptr = ffi.ptr(buf);
 
-// 從 C 指針讀取
 const read = Point.fromPtr(somePtr);
 console.log(read.x, read.y);
 ```
@@ -28,12 +25,12 @@ console.log(read.x, read.y);
 ## Struct()
 
 ```typescript
-function Struct(fields: Record<string, string>): StructSchema;
+function Struct(fields: Record<string, string | StructSchema>): StructSchema;
 ```
 
 | 參數 | 類型 | 說明 |
 |---|---|---|
-| `fields` | `Record<string, string>` | 字段名到類型編碼的映射，如 `{ x: FFIType.int32, y: FFIType.int32 }` |
+| `fields` | `Record<string, string \| StructSchema>` | 字段名到類型編碼的映射，支持嵌套 |
 
 ## StructSchema
 
@@ -48,10 +45,10 @@ readonly size: number;
 ### `create()`
 
 ```typescript
-create(obj: Record<string, number | bigint>): ArrayBuffer;
+create(obj: Record<string, number | bigint | ArrayBuffer>): ArrayBuffer;
 ```
 
-將對象序列化爲 `ArrayBuffer`。
+將對象序列化爲 `ArrayBuffer`。嵌套結構體字段傳入其 `create()` 返回的 `ArrayBuffer`。
 
 ### `fromPtr()`
 
@@ -59,23 +56,61 @@ create(obj: Record<string, number | bigint>): ArrayBuffer;
 fromPtr(ptr: number, byteOffset?: number): Record<string, number>;
 ```
 
-從原始指針讀取結構體數據並反序列化爲對象。
+從原始指針讀取結構體數據。**基本類型字段返回數值，嵌套結構體字段返回指針**（該子結構體在內存中的起始地址），需通過子結構體的 `fromPtr` 進一步讀取。
 
-### `get()`
+### `get()` / `set()`
 
 ```typescript
 get(buf: ArrayBuffer, field: string): number;
-```
-
-從 `ArrayBuffer` 中讀取單個字段。
-
-### `set()`
-
-```typescript
 set(buf: ArrayBuffer, field: string, value: number): void;
 ```
 
-設置 `ArrayBuffer` 中單個字段的值。
+僅支持基本類型字段，嵌套結構體字段返回 `0` / 不操作。
+
+## 嵌套結構體
+
+字段值可以是另一個 `StructSchema`，遞歸計算佈局。
+
+```typescript
+// C: struct Inner { double x, y; };
+// C: struct Outer { struct Inner pos; const char* name; };
+const Inner = Struct({
+  x: FFIType.double,
+  y: FFIType.double,
+});
+const Outer = Struct({
+  pos: Inner,
+  name: FFIType.ptr,
+});
+
+let buf = Outer.create({
+  pos: Inner.create({ x: 1.0, y: 2.0 }),
+  name: 0x1234,
+});
+
+let r = Outer.fromPtr(ptr);
+let innerR = Inner.fromPtr(r.pos);
+console.log(innerR.x, innerR.y); // 1.0, 2.0
+```
+
+## 與 `dlopen` 配合（HFA 結構體傳參）
+
+對於在寄存器中傳遞的小型 HFA 結構體，可直接將 `StructSchema` 用作 `dlopen` 的 `args` / `returns`：
+
+```typescript
+// C: complex_t complex_add(complex_t a, complex_t b);
+const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
+const lib = dlopen(LIB_NAME, {
+  complex_add: { args: [Complex, Complex], returns: Complex },
+});
+
+let a = Complex.create({ real: 1, imag: 2 });
+let b = Complex.create({ real: 3, imag: 4 });
+let ptr: number = lib.symbols.complex_add(a, b);
+let result = Complex.fromPtr(ptr); // { real: 4, imag: 6 }
+```
+
+結構體作爲參數時自動展開爲字段值傳入寄存器；作爲返回值時自動分配 buffer，返回 buffer 的指針。通過 `fromPtr` 同步讀取。
 
 ## ARM64 對齊規則
 
@@ -89,6 +124,8 @@ set(buf: ArrayBuffer, field: string, value: number): void;
 | `b` | `bool` | 1 | 1 |
 | `s` | `const char*`（指針） | 8 | 8 |
 | `p` / `k` | `void*` / 函數指針 | 8 | 8 |
+
+嵌套結構體的對齊取其所有子字段對齊的最大值。
 
 ```typescript
 const Mixed = Struct({
@@ -104,8 +141,6 @@ const buf = Mixed.create({ a: 1, b: 2, c: 3 });
 
 ```typescript
 // C: void setPoint(struct Point* p, int x, int y)
-// 或者 C: double distance(struct Point a, struct Point b)
-// ARM64 上小型結構體通過寄存器傳遞，大型結構體通過指針
 
 const Point = Struct({ x: 'i', y: 'i' });
 const lib = dlopen('lib.so', {
@@ -116,5 +151,5 @@ const buf = Point.create({ x: 0, y: 0 });
 lib.symbols.setPoint(ffi.ptr(buf), 42, 99);
 
 const result = Point.fromPtr(ffi.ptr(buf));
-console.log(result.x, result.y); // 42, 99
+console.log(result.x, result.y);
 ```

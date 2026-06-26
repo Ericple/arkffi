@@ -1,8 +1,8 @@
 import ffi from 'liblibrary.so';
 
 type LooseFFIDef = {
-  args: string[];
-  returns: string;
+  args: (string | StructSchema)[];
+  returns: string | StructSchema;
 };
 
 type ConvertFns<Fns extends Record<string, LooseFFIDef>> = {
@@ -73,24 +73,101 @@ export class CString {
   }
 }
 
-export function CFunction(def: { args: string[]; returns: string; ptr: number }): {
+let g_structResults: Map<number, ArrayBuffer> = new Map();
+
+export function releasePtr(ptr: number): void {
+  g_structResults.delete(ptr);
+}
+
+function expandFields(schema: StructSchema): string[] {
+  let result: string[] = [];
+  for (let i = 0; i < schema.fieldTypes.length; i++) {
+    let t = schema.fieldTypes[i];
+    if (typeof t === 'string') {
+      result.push(t);
+    } else {
+      expandFields(t).forEach(f => result.push(f));
+    }
+  }
+  return result;
+}
+
+function returnEncoding(ret: string | StructSchema): string {
+  if (typeof ret === 'string') return ret;
+  let ft = ret.fieldTypes;
+  if (ft.length === 2 && ft[0] === FFIType.double && ft[1] === FFIType.double) return '2';
+  if (ft.length === 1 && ft[0] === FFIType.double) return 'd';
+  return '2';
+}
+
+function unpackStructBuf(buf: ArrayBuffer, schema: StructSchema): number[] {
+  let view = new DataView(buf);
+  let result: number[] = [];
+  for (let i = 0; i < schema.fieldTypes.length; i++) {
+    let off = schema.fieldOffsets[i];
+    let t = schema.fieldTypes[i];
+    if (typeof t !== 'string') {
+      let subBuf = buf.slice(off, off + t.size);
+      unpackStructBuf(subBuf, t).forEach(v => result.push(v));
+    } else if (t === FFIType.double || t === FFIType.float) {
+      result.push(view.getFloat64(off, true));
+    } else if (t === FFIType.int32 || t === FFIType.bool || t === FFIType.char) {
+      result.push(view.getInt32(off, true));
+    } else if (t === FFIType.int64 || t === FFIType.ptr || t === FFIType.callback) {
+      result.push(Number(view.getBigInt64(off, true)));
+    } else {
+      result.push(view.getInt32(off, true));
+    }
+  }
+  return result;
+}
+
+function joinTypes(types: string[]): string {
+  let result: string = '';
+  for (let i = 0; i < types.length; i++) {
+    result += types[i];
+  }
+  return result;
+}
+
+export function CFunction(def: { args: (string | StructSchema)[]; returns: string | StructSchema; ptr: number }): {
   (...args: any[]): number;
   close(): void;
 } {
-  let typeStr: string = joinTypes(def.args);
+  let flatArgs: string[] = [];
+  for (let j = 0; j < def.args.length; j++) {
+    if (typeof def.args[j] === 'string') {
+      flatArgs.push(def.args[j] as string);
+    } else {
+      expandFields(def.args[j] as StructSchema).forEach(t => flatArgs.push(t));
+    }
+  }
+  let typeStr: string = joinTypes(flatArgs);
+  let isStructReturn = typeof def.returns !== 'string';
+  let retEnc: string = returnEncoding(def.returns);
+
   let wrapper: any = (...rawArgs: any[]): number => {
     let numArgs: number[] = [];
     let strArgs: string[] = [];
     for (let j = 0; j < def.args.length; j++) {
-      if (def.args[j] == 's') {
+      let argDef = def.args[j];
+      if (argDef === FFIType.CString) {
         strArgs.push(rawArgs[j] as string);
-      } else if (def.args[j] == 'k') {
+      } else if (typeof argDef !== 'string') {
+        unpackStructBuf(rawArgs[j] as ArrayBuffer, argDef as StructSchema).forEach(v => numArgs.push(v));
+      } else if (argDef === FFIType.callback) {
         numArgs.push((rawArgs[j] as any).ptr ?? (rawArgs[j] as number));
       } else {
         numArgs.push(rawArgs[j] as number);
       }
     }
-    return ffi.callPtr(def.ptr, typeStr, def.returns, numArgs, strArgs);
+    if (isStructReturn) {
+      let buf: ArrayBuffer = ffi.callPtr(def.ptr, typeStr, retEnc, numArgs, strArgs) as unknown as ArrayBuffer;
+      let ptrOut: number = ffi.ptr(buf);
+      g_structResults.set(ptrOut, buf);
+      return ptrOut;
+    }
+    return ffi.callPtr(def.ptr, typeStr, def.returns as string, numArgs, strArgs);
   };
   wrapper.close = (): void => {};
   return wrapper;
@@ -131,24 +208,46 @@ export function callPtrAsync(
   return ffi.callPtrAsync(ptr, argTypes, returnType, numArgs, strArgs);
 }
 
-export function AsyncCFunction(def: { args: string[]; returns: string; ptr: number }): {
+export function AsyncCFunction(def: { args: (string | StructSchema)[]; returns: string | StructSchema; ptr: number }): {
   (...args: any[]): Promise<number>;
   close(): void;
 } {
-  let typeStr: string = joinTypes(def.args);
+  let flatArgs: string[] = [];
+  for (let j = 0; j < def.args.length; j++) {
+    if (typeof def.args[j] === 'string') {
+      flatArgs.push(def.args[j] as string);
+    } else {
+      expandFields(def.args[j] as StructSchema).forEach(t => flatArgs.push(t));
+    }
+  }
+  let typeStr: string = joinTypes(flatArgs);
+  let isStructReturn = typeof def.returns !== 'string';
+  let retEnc: string = returnEncoding(def.returns);
+
   let wrapper: any = (...rawArgs: any[]): Promise<number> => {
     let numArgs: number[] = [];
     let strArgs: string[] = [];
     for (let j = 0; j < def.args.length; j++) {
-      if (def.args[j] == 's') {
+      let argDef = def.args[j];
+      if (argDef === FFIType.CString) {
         strArgs.push(rawArgs[j] as string);
-      } else if (def.args[j] == 'k') {
+      } else if (typeof argDef !== 'string') {
+        unpackStructBuf(rawArgs[j] as ArrayBuffer, argDef as StructSchema).forEach(v => numArgs.push(v));
+      } else if (argDef === FFIType.callback) {
         numArgs.push((rawArgs[j] as any).ptr ?? (rawArgs[j] as number));
       } else {
         numArgs.push(rawArgs[j] as number);
       }
     }
-    return ffi.callPtrAsync(def.ptr, typeStr, def.returns, numArgs, strArgs);
+    if (isStructReturn) {
+      let p: Promise<any> = ffi.callPtrAsync(def.ptr, typeStr, retEnc, numArgs, strArgs);
+      return p.then((buf: ArrayBuffer): number => {
+        let ptrOut: number = ffi.ptr(buf);
+        g_structResults.set(ptrOut, buf);
+        return ptrOut;
+      });
+    }
+    return ffi.callPtrAsync(def.ptr, typeStr, def.returns as string, numArgs, strArgs);
   };
   wrapper.close = (): void => {};
   return wrapper;
@@ -190,14 +289,6 @@ function extractArg(raw: any, typeCode: string): number {
   return raw;
 }
 
-function joinTypes(types: string[]): string {
-  let result: string = '';
-  for (let i = 0; i < types.length; i++) {
-    result += types[i];
-  }
-  return result;
-}
-
 const TYPE_SIZE: Record<string, number> = {
   'c': 1, 'i': 4, 'l': 8, 'd': 8, 'f': 4, 'b': 1, 's': 8, 'p': 8, 'k': 8,
 };
@@ -208,13 +299,14 @@ const TYPE_ALIGN: Record<string, number> = {
 
 export class StructSchema {
   readonly fieldNames: string[];
-  readonly fieldTypes: string[];
+  readonly fieldTypes: (string | StructSchema)[];
   readonly fieldOffsets: number[];
   readonly size: number;
+  readonly alignment: number;
 
-  constructor(fields: Record<string, string>) {
+  constructor(fields: Record<string, string | StructSchema>) {
     let names: string[] = [];
-    let types: string[] = [];
+    let types: (string | StructSchema)[] = [];
     for (let key in fields) {
       names.push(key);
       types.push(fields[key]);
@@ -227,35 +319,50 @@ export class StructSchema {
     let maxAlign = 1;
     for (let i = 0; i < names.length; i++) {
       let t = types[i];
-      let align = TYPE_ALIGN[t] ?? 4;
-      let size = TYPE_SIZE[t] ?? 4;
+      let align: number;
+      let sz: number;
+      if (typeof t === 'string') {
+        align = TYPE_ALIGN[t] ?? 4;
+        sz = TYPE_SIZE[t] ?? 4;
+      } else {
+        align = t.alignment;
+        sz = t.size;
+      }
       if (align > maxAlign) maxAlign = align;
       let padding = (align - (offset % align)) % align;
       this.fieldOffsets.push(offset + padding);
-      offset += padding + size;
+      offset += padding + sz;
     }
     let finalPad = (maxAlign - (offset % maxAlign)) % maxAlign;
     this.size = offset + finalPad;
+    this.alignment = maxAlign;
   }
 
-  create(obj: Record<string, number | bigint>): ArrayBuffer {
+  create(obj: Record<string, number | bigint | ArrayBuffer>): ArrayBuffer {
     let buf = new ArrayBuffer(this.size);
     let view = new DataView(buf);
     for (let i = 0; i < this.fieldNames.length; i++) {
       let name = this.fieldNames[i];
       let t = this.fieldTypes[i];
       let off = this.fieldOffsets[i];
-      let val = obj[name] as number;
-      if (t == 'i' || t == 'b' || t == 'c') {
-        view.setInt32(off, val, true);
+      let val = obj[name];
+      if (typeof t !== 'string') {
+        let subBuf = val as ArrayBuffer;
+        let src = new Uint8Array(subBuf);
+        let dst = new Uint8Array(buf);
+        for (let j = 0; j < subBuf.byteLength; j++) {
+          dst[off + j] = src[j];
+        }
+      } else if (t == 'i' || t == 'b' || t == 'c') {
+        view.setInt32(off, val as number, true);
       } else if (t == 'l') {
-        view.setBigInt64(off, BigInt(val), true);
+        view.setBigInt64(off, BigInt(val as number), true);
       } else if (t == 'd') {
-        view.setFloat64(off, val, true);
+        view.setFloat64(off, val as number, true);
       } else if (t == 'f') {
-        view.setFloat32(off, val, true);
+        view.setFloat32(off, val as number, true);
       } else if (t == 's' || t == 'p' || t == 'k') {
-        view.setBigInt64(off, BigInt(val), true);
+        view.setBigInt64(off, BigInt(val as number), true);
       }
     }
     return buf;
@@ -270,7 +377,9 @@ export class StructSchema {
       let name = this.fieldNames[i];
       let t = this.fieldTypes[i];
       let off = this.fieldOffsets[i];
-      if (t == 'i' || t == 'b' || t == 'c') {
+      if (typeof t !== 'string') {
+        result[name] = ptr + base + off;
+      } else if (t == 'i' || t == 'b' || t == 'c') {
         result[name] = view.getInt32(off, true);
       } else if (t == 'l') {
         result[name] = Number(view.getBigInt64(off, true));
@@ -291,6 +400,7 @@ export class StructSchema {
     let view = new DataView(buf);
     let off = this.fieldOffsets[idx];
     let t = this.fieldTypes[idx];
+    if (typeof t !== 'string') return 0;
     if (t == 'i' || t == 'b' || t == 'c') return view.getInt32(off, true);
     if (t == 'l') return Number(view.getBigInt64(off, true));
     if (t == 'd') return view.getFloat64(off, true);
@@ -305,6 +415,7 @@ export class StructSchema {
     let view = new DataView(buf);
     let off = this.fieldOffsets[idx];
     let t = this.fieldTypes[idx];
+    if (typeof t !== 'string') return;
     if (t == 'i' || t == 'b' || t == 'c') view.setInt32(off, value, true);
     else if (t == 'l') view.setBigInt64(off, BigInt(value), true);
     else if (t == 'd') view.setFloat64(off, value, true);
@@ -313,7 +424,7 @@ export class StructSchema {
   }
 }
 
-export function Struct(fields: Record<string, string>): StructSchema {
+export function Struct(fields: Record<string, string | StructSchema>): StructSchema {
   return new StructSchema(fields);
 }
 
@@ -342,19 +453,41 @@ export function dlopen<Fns extends Record<string, LooseFFIDef>>(
   for (let i = 0; i < keys.length; i++) {
     let name: string = keys[i];
     let def: LooseFFIDef = defs[name];
-    let typeStr: string = joinTypes(def.args);
-    ffi.defineFunction(handle, name, typeStr, def.returns);
+
+    let flatArgs: string[] = [];
+    for (let j = 0; j < def.args.length; j++) {
+      let argDef = def.args[j];
+      if (typeof argDef === 'string') {
+        flatArgs.push(argDef);
+      } else {
+        expandFields(argDef as StructSchema).forEach(t => flatArgs.push(t));
+      }
+    }
+    let typeStr: string = joinTypes(flatArgs);
+    let retEnc: string = returnEncoding(def.returns);
+    let isStructReturn = typeof def.returns !== 'string';
+
+    ffi.defineFunction(handle, name, typeStr, retEnc);
 
     Object.defineProperty(symbols, name, {
       value: (...rawArgs: any[]): any => {
         let numArgs: number[] = [];
         let strArgs: string[] = [];
         for (let j = 0; j < def.args.length; j++) {
-          if (def.args[j] == 's') {
+          let argDef = def.args[j];
+          if (argDef === FFIType.CString) {
             strArgs.push(rawArgs[j] as string);
+          } else if (typeof argDef !== 'string') {
+            unpackStructBuf(rawArgs[j] as ArrayBuffer, argDef as StructSchema).forEach(v => numArgs.push(v));
           } else {
-            numArgs.push(extractArg(rawArgs[j], def.args[j]));
+            numArgs.push(extractArg(rawArgs[j], argDef));
           }
+        }
+        if (isStructReturn) {
+          let buf: ArrayBuffer = ffi.callBySig(handle, name, numArgs, strArgs) as unknown as ArrayBuffer;
+          let ptrOut: number = ffi.ptr(buf);
+          g_structResults.set(ptrOut, buf);
+          return ptrOut;
         }
         return ffi.callBySig(handle, name, numArgs, strArgs);
       },
@@ -368,13 +501,24 @@ export function dlopen<Fns extends Record<string, LooseFFIDef>>(
         let numArgs: number[] = [];
         let strArgs: string[] = [];
         for (let j = 0; j < def.args.length; j++) {
-          if (def.args[j] == 's') {
+          let argDef = def.args[j];
+          if (argDef === FFIType.CString) {
             strArgs.push(rawArgs[j] as string);
+          } else if (typeof argDef !== 'string') {
+            unpackStructBuf(rawArgs[j] as ArrayBuffer, argDef as StructSchema).forEach(v => numArgs.push(v));
           } else {
-            numArgs.push(extractArg(rawArgs[j], def.args[j]));
+            numArgs.push(extractArg(rawArgs[j], argDef));
           }
         }
-        return ffi.callAsync(handle, name, typeStr, def.returns, numArgs, strArgs);
+        if (isStructReturn) {
+          let p: Promise<any> = ffi.callAsync(handle, name, typeStr, retEnc, numArgs, strArgs);
+          return p.then((buf: ArrayBuffer): number => {
+            let ptrOut: number = ffi.ptr(buf);
+            g_structResults.set(ptrOut, buf);
+            return ptrOut;
+          });
+        }
+        return ffi.callAsync(handle, name, typeStr, retEnc, numArgs, strArgs);
       },
       writable: true,
       enumerable: true,
