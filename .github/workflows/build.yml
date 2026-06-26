@@ -23,6 +23,11 @@ jobs:
           echo "DEVECO_SDK_HOME=${COMMANDLINE_TOOL_DIR}/sdk" >> "$GITHUB_ENV"
           echo "OHOS_SDK_HOME=${COMMANDLINE_TOOL_DIR}/sdk" >> "$GITHUB_ENV"
 
+      - name: Install dependencies
+        run: |
+          cd /workspace
+          ohpm install --all
+
       - name: Build HAR
         run: |
           cd /workspace
