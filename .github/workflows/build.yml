@@ -30,12 +30,41 @@ jobs:
             echo "DEVECO_SDK_HOME=$HOME/ohos-sdk" >> "$GITHUB_ENV"
           fi
 
+          HVIGORW=$(find "$HOME/ohos-sdk" -name "hvigorw" -type f | head -1)
+          if [ -z "$HVIGORW" ]; then
+            HVIGORW=$(find "$HOME/ohos-sdk" -name "hvigorw.js" -type f | head -1)
+          fi
+          if [ -n "$HVIGORW" ]; then
+            chmod +x "$HVIGORW"
+            echo "HVIGORW=$HVIGORW" >> "$GITHUB_ENV"
+          else
+            # Try the npm package from the SDK
+            HVIGOR_DIR=$(find "$HOME/ohos-sdk" -path "*/node_modules/@ohos/hvigor" -type d | head -1)
+            if [ -n "$HVIGOR_DIR" ]; then
+              echo "HVIGOR_DIR=$HVIGOR_DIR" >> "$GITHUB_ENV"
+            fi
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Build HAR
-        run: npx @ohos/hvigor assembleHar --mode module -p module=library -p buildMode=debug
+        run: |
+          if [ -n "$HVIGORW" ]; then
+            node "$HVIGORW" assembleHar --mode module -p module=library -p buildMode=debug
+          elif [ -n "$HVIGOR_DIR" ]; then
+            node "$HVIGOR_DIR/bin/hvigorw.js" assembleHar --mode module -p module=library -p buildMode=debug
+          else
+            npx @ohos/hvigor assembleHar --mode module -p module=library -p buildMode=debug
+          fi
 
       - name: Build HAP
-        run: npx @ohos/hvigor assembleHap --mode module -p module=entry -p buildMode=debug
+        run: |
+          if [ -n "$HVIGORW" ]; then
+            node "$HVIGORW" assembleHap --mode module -p module=entry -p buildMode=debug
+          elif [ -n "$HVIGOR_DIR" ]; then
+            node "$HVIGOR_DIR/bin/hvigorw.js" assembleHap --mode module -p module=entry -p buildMode=debug
+          else
+            npx @ohos/hvigor assembleHap --mode module -p module=entry -p buildMode=debug
+          fi
