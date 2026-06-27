@@ -57,8 +57,18 @@ struct Index {
             complex_add: { args: [Complex, Complex], returns: Complex },
             complex_sub: { args: [Complex, Complex], returns: Complex },
             complex_mul: { args: [Complex, Complex], returns: Complex },
-            fft: { args: [FFIType.ptr, FFIType.int32], returns: FFIType.void }
+            fft: { args: [FFIType.ptr, FFIType.int32], returns: FFIType.void },
+            hann_window: { args: [FFIType.ptr, FFIType.uint32_t], returns: FFIType.void },
+            hamming_window: { args: [FFIType.ptr, FFIType.uint32_t], returns: FFIType.void }
           });
+
+          const N = 12
+          const ab = new ArrayBuffer(4 * N);
+          const f32a = new Float32Array(ab).fill(0.5);
+          const ptr = ffi.ptr(ab);
+          console.log('before u8', f32a.toString());
+          LibFFT.symbols.hann_window(ptr, N);
+          console.log('after u8', f32a.toString())
 
           let newPtr: number = LibFFT.symbols.complex_new(3.0, 2.0);
           let newVal = Complex.fromPtr(newPtr);
@@ -79,7 +89,7 @@ struct Index {
             });
           console.log('LibFFT.symbols.complex_mul.async');
         })
-      Button('fft')
+      Button('complex')
         .onClick(() => {
           const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
           let lib = dlopen(LIB_NAME_FFT, {
