@@ -49,6 +49,7 @@
           {
             "group": "\u793a\u4f8b",
             "pages": [
+              "zh/examples/fft",
               "zh/examples/complete"
             ]
           }
@@ -92,6 +93,7 @@
           {
             "group": "\u7bc4\u4f8b",
             "pages": [
+              "zh-Hant/examples/fft",
               "zh-Hant/examples/complete"
             ]
           }
@@ -135,6 +137,7 @@
           {
             "group": "Examples",
             "pages": [
+              "en/examples/fft",
               "en/examples/complete"
             ]
           }

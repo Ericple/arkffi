@@ -90,18 +90,30 @@ ffi.close(handle);
 
 ## 与 `dlopen` 配合使用
 
-函数必须通过 `defineFunction` 注册到注册表后才能异步调用：
-
 ```typescript
-const handle = ffi.load('libffi_target.so');
-ffi.defineFunction(handle, 'add', 'dd', 'd');
-
-const p1 = ffi.callAsync(handle, 'add', 'dd', 'd', [1.0, 2.0], []);
-const p2 = ffi.callAsync(handle, 'add', 'dd', 'd', [3.0, 4.0], []);
-Promise.all([p1, p2]).then(([r1, r2]) => {
-  console.log(r1, r2);
-  ffi.close(handle);
+const Complex = Struct({
+  real: FFIType.double,
+  imag: FFIType.double,
 });
+const LibFFT = dlopen(LIB_NAME_FFT, {
+  complex_new: { args: [FFIType.double, FFIType.double], returns: Complex },
+  complex_add: { args: [Complex, Complex], returns: Complex },
+  complex_sub: { args: [Complex, Complex], returns: Complex },
+  complex_mul: { args: [Complex, Complex], returns: Complex },
+  fft: { args: [FFIType.ptr, FFIType.int32], returns: FFIType.void }
+});
+
+let a = Complex.create({ real: 4, imag: 1 });
+let b = Complex.create({ real: 3, imag: 3 });
+LibFFT.symbols.complex_mul.async(a, b)
+  .then((mulPtr) => {
+    let mulVal = Complex.fromPtr(mulPtr);
+    console.log('complex_mul', mulVal.real, mulVal.imag);
+  })
+  .finally(() => {
+    LibFFT.close();
+  });
+console.log('LibFFT.symbols.complex_mul.async');
 ```
 
 ## 实现原理

@@ -5,8 +5,13 @@ type LooseFFIDef = {
   returns: string | StructSchema;
 };
 
+interface AsyncableFunction {
+  (...args: any[]): any;
+  async: (...args: any[]) => Promise<number>;
+}
+
 type ConvertFns<Fns extends Record<string, LooseFFIDef>> = {
-  [K in keyof Fns]: (...args: any[]) => number;
+  [K in keyof Fns]: AsyncableFunction;
 };
 
 export class FFIType {
@@ -93,10 +98,16 @@ function expandFields(schema: StructSchema): string[] {
 }
 
 function returnEncoding(ret: string | StructSchema): string {
-  if (typeof ret === 'string') return ret;
+  if (typeof ret === 'string') {
+    return ret;
+  }
   let ft = ret.fieldTypes;
-  if (ft.length === 2 && ft[0] === FFIType.double && ft[1] === FFIType.double) return '2';
-  if (ft.length === 1 && ft[0] === FFIType.double) return 'd';
+  if (ft.length === 2 && ft[0] === FFIType.double && ft[1] === FFIType.double) {
+    return '2';
+  }
+  if (ft.length === 1 && ft[0] === FFIType.double) {
+    return 'd';
+  }
   return '2';
 }
 
@@ -169,7 +180,8 @@ export function CFunction(def: { args: (string | StructSchema)[]; returns: strin
     }
     return ffi.callPtr(def.ptr, typeStr, def.returns as string, numArgs, strArgs);
   };
-  wrapper.close = (): void => {};
+  wrapper.close = (): void => {
+  };
   return wrapper;
 }
 
@@ -249,7 +261,8 @@ export function AsyncCFunction(def: { args: (string | StructSchema)[]; returns: 
     }
     return ffi.callPtrAsync(def.ptr, typeStr, def.returns as string, numArgs, strArgs);
   };
-  wrapper.close = (): void => {};
+  wrapper.close = (): void => {
+  };
   return wrapper;
 }
 
@@ -290,11 +303,27 @@ function extractArg(raw: any, typeCode: string): number {
 }
 
 const TYPE_SIZE: Record<string, number> = {
-  'c': 1, 'i': 4, 'l': 8, 'd': 8, 'f': 4, 'b': 1, 's': 8, 'p': 8, 'k': 8,
+  'c': 1,
+  'i': 4,
+  'l': 8,
+  'd': 8,
+  'f': 4,
+  'b': 1,
+  's': 8,
+  'p': 8,
+  'k': 8,
 };
 
 const TYPE_ALIGN: Record<string, number> = {
-  'c': 1, 'i': 4, 'l': 8, 'd': 8, 'f': 4, 'b': 1, 's': 8, 'p': 8, 'k': 8,
+  'c': 1,
+  'i': 4,
+  'l': 8,
+  'd': 8,
+  'f': 4,
+  'b': 1,
+  's': 8,
+  'p': 8,
+  'k': 8,
 };
 
 export class StructSchema {
@@ -328,7 +357,9 @@ export class StructSchema {
         align = t.alignment;
         sz = t.size;
       }
-      if (align > maxAlign) maxAlign = align;
+      if (align > maxAlign) {
+        maxAlign = align;
+      }
       let padding = (align - (offset % align)) % align;
       this.fieldOffsets.push(offset + padding);
       offset += padding + sz;
@@ -396,31 +427,57 @@ export class StructSchema {
 
   get(buf: ArrayBuffer, field: string): number {
     let idx = this.fieldNames.indexOf(field);
-    if (idx < 0) return 0;
+    if (idx < 0) {
+      return 0;
+    }
     let view = new DataView(buf);
     let off = this.fieldOffsets[idx];
     let t = this.fieldTypes[idx];
-    if (typeof t !== 'string') return 0;
-    if (t == 'i' || t == 'b' || t == 'c') return view.getInt32(off, true);
-    if (t == 'l') return Number(view.getBigInt64(off, true));
-    if (t == 'd') return view.getFloat64(off, true);
-    if (t == 'f') return view.getFloat32(off, true);
-    if (t == 's' || t == 'p' || t == 'k') return Number(view.getBigInt64(off, true));
+    if (typeof t !== 'string') {
+      return 0;
+    }
+    if (t == 'i' || t == 'b' || t == 'c') {
+      return view.getInt32(off, true);
+    }
+    if (t == 'l') {
+      return Number(view.getBigInt64(off, true));
+    }
+    if (t == 'd') {
+      return view.getFloat64(off, true);
+    }
+    if (t == 'f') {
+      return view.getFloat32(off, true);
+    }
+    if (t == 's' || t == 'p' || t == 'k') {
+      return Number(view.getBigInt64(off, true));
+    }
     return 0;
   }
 
   set(buf: ArrayBuffer, field: string, value: number): void {
     let idx = this.fieldNames.indexOf(field);
-    if (idx < 0) return;
+    if (idx < 0) {
+      return;
+    }
     let view = new DataView(buf);
     let off = this.fieldOffsets[idx];
     let t = this.fieldTypes[idx];
-    if (typeof t !== 'string') return;
-    if (t == 'i' || t == 'b' || t == 'c') view.setInt32(off, value, true);
-    else if (t == 'l') view.setBigInt64(off, BigInt(value), true);
-    else if (t == 'd') view.setFloat64(off, value, true);
-    else if (t == 'f') view.setFloat32(off, value, true);
-    else if (t == 's' || t == 'p' || t == 'k') view.setBigInt64(off, BigInt(value), true);
+    if (typeof t !== 'string') {
+      return;
+    }
+    if (t == 'i' || t == 'b' || t == 'c') {
+      view.setInt32(off, value, true);
+    } else if (t == 'l') {
+      view.setBigInt64(off,
+        BigInt(value), true);
+    } else if (t == 'd') {
+      view.setFloat64(off, value, true);
+    } else if (t == 'f') {
+      view.setFloat32(
+        off, value, true);
+    } else if (t == 's' || t == 'p' || t == 'k') {
+      view.setBigInt64(off, BigInt(value), true);
+    }
   }
 }
 
@@ -447,7 +504,7 @@ export function dlopen<Fns extends Record<string, LooseFFIDef>>(
   defs: Fns,
 ): Library<Fns> {
   let handle: bigint = ffi.load(libName);
-  let symbols: Record<string, (...args: any[]) => any> = {};
+  let symbols: Record<string, AsyncableFunction> = {};
 
   let keys: string[] = Object.keys(defs);
   for (let i = 0; i < keys.length; i++) {

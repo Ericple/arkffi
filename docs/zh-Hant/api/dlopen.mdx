@@ -77,6 +77,33 @@ defineFunction(handle, 'complex_add', 'dddd', '2')
   NAPI 返回 buffer → ffi.ptr(buf) → 指針返回給用戶
 ```
 
+## 異步調用
+
+每個 `symbols` 下的函數都掛載了 `.async` 方法，用於在工作線程上非阻塞調用：
+
+```typescript
+const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
+const lib = dlopen('libfft.so', {
+  complex_mul: { args: [Complex, Complex], returns: Complex },
+});
+
+let a = Complex.create({ real: 4, imag: 1 });
+let b = Complex.create({ real: 3, imag: 3 });
+lib.symbols.complex_mul.async(a, b).then((ptr: number) => {
+  let result = Complex.fromPtr(ptr);
+  releasePtr(ptr);
+});
+```
+
+對於基本返回類型，Promise 直接 resolve 值：
+
+```typescript
+const lib = dlopen('lib.so', {
+  add: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+});
+lib.symbols.add.async(2.0, 3.0).then((r: number) => console.log(r));
+```
+
 ## 類型推斷
 
 `dlopen` 使用 TypeScript 泛型推斷 `symbols` 的結構，爲所有定義的函數名提供 IDE 自動補全。

@@ -77,6 +77,33 @@ At call time:
   NAPI returns buffer → ffi.ptr(buf) → pointer returned to user
 ```
 
+## Async Calls
+
+Each symbol has an `.async` method for non-blocking calls on a worker thread:
+
+```typescript
+const Complex = Struct({ real: FFIType.double, imag: FFIType.double });
+const lib = dlopen('libfft.so', {
+  complex_mul: { args: [Complex, Complex], returns: Complex },
+});
+
+let a = Complex.create({ real: 4, imag: 1 });
+let b = Complex.create({ real: 3, imag: 3 });
+lib.symbols.complex_mul.async(a, b).then((ptr: number) => {
+  let result = Complex.fromPtr(ptr);
+  releasePtr(ptr);
+});
+```
+
+For basic return types, the Promise resolves with the value directly:
+
+```typescript
+const lib = dlopen('lib.so', {
+  add: { args: [FFIType.double, FFIType.double], returns: FFIType.double },
+});
+lib.symbols.add.async(2.0, 3.0).then((r: number) => console.log(r));
+```
+
 ## Type Inference
 
 `dlopen` uses TypeScript generics to infer the shape of `symbols`, providing IDE autocompletion for all defined function names.

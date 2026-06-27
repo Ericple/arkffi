@@ -1,0 +1,134 @@
+---
+title: "快速傅立葉變換"
+description: "arkffi 中 struct 的運用"
+---
+
+## C 庫代碼
+
+```C
+#include <math.h>
+typedef struct {
+    double real;
+    double imag;
+} complex_t;
+
+complex_t complex_new(double r, double i) {
+    complex_t c; c.real = r; c.imag = i; return c;
+}
+
+complex_t complex_add(complex_t a, complex_t b) {
+    return complex_new(a.real + b.real, a.imag + b.imag);
+}
+
+complex_t complex_sub(complex_t a, complex_t b) {
+    return complex_new(a.real - b.real, a.imag - b.imag);
+}
+
+complex_t complex_mul(complex_t a, complex_t b) {
+    return complex_new(
+        a.real * b.real - a.imag * b.imag,
+        a.real * b.imag + a.imag * b.real
+    );
+}
+
+const char* hello(void) {
+    return "Hello, World!";
+}
+
+unsigned int bit_reverse(unsigned int x, unsigned int log2n) {
+    unsigned int n = 0;
+    for (unsigned int i = 0; i < log2n; i++) {
+        n = (n<<1)|(x&1);
+        x>>=1;
+    }
+    return n;
+}
+
+void fft(complex_t *data, unsigned int n) {
+    unsigned int log2n = 0;
+    while ((1U << log2n) < n) log2n++;
+
+    for (unsigned int i = 0; i < n; i++) {
+        unsigned int j = bit_reverse(i, log2n);
+        if (j > i) {
+            complex_t tmp = data[i];
+            data[i] = data[j];
+            data[j] = tmp;
+        }
+    }
+
+    for (unsigned int s = 1; s <= log2n; s++) {
+        unsigned int m = 1U << s;
+        unsigned int m2 = m >> 1;
+
+        double ang = -2.0 * M_PI / m;
+        complex_t wm = complex_new(cos(ang), sin(ang));
+
+        for (unsigned int k = 0; k < n; k += m) {
+            complex_t w = complex_new(1.0, 0.0);
+            for (unsigned int j = 0; j < m2; j++) {
+                complex_t t = complex_mul(w, data[k + j + m2]);
+                complex_t u = data[k + j];
+                data[k + j]        = complex_add(u, t);
+                data[k + j + m2]   = complex_sub(u, t);
+                w = complex_mul(w, wm);
+            }
+        }
+    }
+}
+```
+
+## ArkTS 宣告
+
+```ts
+const Complex = Struct({
+    real: FFIType.double,
+    imag: FFIType.double,
+});
+const LibFFT = dlopen(LIB_NAME_FFT, {
+    complex_new: { args: [FFIType.double, FFIType.double], returns: Complex },
+    complex_add: { args: [Complex, Complex], returns: Complex },
+    complex_sub: { args: [Complex, Complex], returns: Complex },
+    complex_mul: { args: [Complex, Complex], returns: Complex },
+    fft: { args: [FFIType.ptr, FFIType.int32], returns: FFIType.void }
+});
+```
+
+## 呼叫 `complex_new`
+
+```ts
+let newPtr: number = LibFFT.symbols.complex_new(3.0, 2.0);
+let newVal = Complex.fromPtr(newPtr);
+console.log('complex_new:', newVal.real, newVal.imag);
+```
+
+## 呼叫 `complex_add`
+
+```ts
+let a = Complex.create({ real: 4, imag: 1 });
+let b = Complex.create({ real: 3, imag: 3 });
+let addPtr: number = LibFFT.symbols.complex_add(a, b);
+let addVal = Complex.fromPtr(addPtr);
+console.log('complex_add:', addVal.real, addVal.imag);
+```
+
+## 呼叫 `fft`
+
+```ts
+let n = 4;
+let buf = new ArrayBuffer(Complex.size * n);
+let view = new DataView(buf);
+
+for (let i = 0; i < n; i++) {
+  view.setFloat64(i * Complex.size,      i * 2 + 1, true);
+  view.setFloat64(i * Complex.size + 8,  i * 2 + 2, true);
+}
+
+let dataPtr = ffi.ptr(buf);
+LibFFT.symbols.fft(dataPtr, n);
+
+for (let i = 0; i < n; i++) {
+  let result = Complex.fromPtr(dataPtr, i * Complex.size);
+  console.log('result[' + i + ']:', result.real, result.imag);
+}
+```
